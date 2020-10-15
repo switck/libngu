@@ -1,0 +1,6 @@
+[submodule "libs/secp256k1"]
+	path = libs/secp256k1
+	url = https://github.com/bitcoin-core/secp256k1.git
+[submodule "libs/micropython"]
+	path = libs/micropython
+	url = git-switck:switck/micropython.git

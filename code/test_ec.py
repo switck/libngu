@@ -1,12 +1,13 @@
 try:
     # Desktop: make test vectors
-    from ecdsa import SigningKey, VerifyingKey
+    from ecdsa import SigningKey
     from ecdsa.util import sigencode_string
     from ecdsa.curves import SECP256k1, BRAINPOOLP256r1, NIST256p
     from hashlib import sha256
 
     with open('test_ec_sig.py', 'wt') as fd:
-        print("import ngu   # auto-gen/no-edit", file=fd)
+        print("import gc, ngu  # auto-gen", file=fd)
+        print("for i in range(25):", file=fd)
 
         pks = [ b'\x55'*32, b'\x0f'+(b'\xff'*31)]
         md = b'MSG1'*8
@@ -14,13 +15,20 @@ try:
             for name, c in [ ('SECP256K1', SECP256k1), 
                                 ('BP256R1', BRAINPOOLP256r1), 
                                 ('NIST_P256', NIST256p) ]:
+                print('  cur = ngu.ec.curve(ngu.ec.%s)' % name, file=fd)
 
                 key = SigningKey.from_string(pk, curve=c, hashfunc=sha256)
-                rv = key.sign_digest_deterministic(md, hashfunc=sha256, sigencode=sigencode_string)
+                sig = key.sign_digest_deterministic(md, hashfunc=sha256, sigencode=sigencode_string)
 
-                print('assert ngu.ec.curve(ngu.ec.%s).sign(%r, %r) == %r' % (
-                        name, pk, md, rv), file=fd)
+                print('  assert cur.sign(%r, %r) == %r' % (pk, md, sig), file=fd)
 
+                pub = key.get_verifying_key().to_string()
+                print('  assert cur.verify(%r, %r, %r) == True' % (b'\x04'+pub, sig, md), file=fd)
+                print('  assert cur.verify(%r, %r, %r) == False' % (b'\x04'+pub, sig[0:-2]+bytes(2), md), file=fd)
+
+                print('  del cur', file=fd)
+
+        print("  gc.collect()", file=fd)
         print("print('PASS')", file=fd)
         print("run code now in: %s" % fd.name)
 
@@ -48,5 +56,10 @@ try:
     assert False
 except RuntimeError:
     pass
+
+try:
+    ngu.ec.curve(ngu.ec.SECP256K1).verify('\x04'*65, bytes(64), bytes(32))
+except ValueError as exc:
+    assert 'pubkey vs. curve' in str(exc)
 
 print('PASS')

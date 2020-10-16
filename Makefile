@@ -30,4 +30,5 @@ clean:
 tags:
 	ctags -f .tags *.[ch]
 
-
+test:
+	(cd code; make test)

@@ -15,6 +15,7 @@
 // All submodules here.
 extern const mp_obj_module_t mp_module_hash;
 extern const mp_obj_module_t mp_module_ec;
+extern const mp_obj_module_t mp_module_cert;
 
 STATIC const mp_rom_map_elem_t mp_module_ngu_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_ngu) },
@@ -24,6 +25,7 @@ STATIC const mp_rom_map_elem_t mp_module_ngu_globals_table[] = {
 
     { MP_ROM_QSTR(MP_QSTR_hash), MP_ROM_PTR(&mp_module_hash) },
     { MP_ROM_QSTR(MP_QSTR_ec), MP_ROM_PTR(&mp_module_ec) },
+    { MP_ROM_QSTR(MP_QSTR_cert), MP_ROM_PTR(&mp_module_cert) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ngu_globals, mp_module_ngu_globals_table);

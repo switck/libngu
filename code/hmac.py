@@ -12,13 +12,14 @@ class HMAC:
     """
     blocksize = 64  # 512-bit HMAC; can be changed in subclasses.
 
-    def __init__(self, key, msg = None, digestmod = None):
+    def __init__(self, key, msg = None, digestmod = None, digest_info=0):
         """Create a new HMAC object.
 
         key:       key for the keyed hash object.
         msg:       Initial input for the hash, if provided.
         digestmod: A module supporting PEP 247.  *OR*
-                   A hashlib constructor returning a new hash object. *OR*
+                   A hashlib constructor returning a new hash object.
+        digest_info:    tuple(digest_size, block_size) for inner hash funct (optional)
 
         Note: key and msg must be a bytes or bytearray objects.
         """
@@ -28,9 +29,13 @@ class HMAC:
 
         self.outer = digestmod()
         self.inner = digestmod()
-        self.digest_size = self.inner.digest_size
 
-        blocksize = self.inner.block_size
+        if digest_info is None:
+            self.digest_size = self.inner.digest_size
+            blocksize = self.inner.block_size
+        else:
+            self.digest_size, blocksize = digest_info
+
         assert blocksize >= 16
 
         # self.blocksize is the default blocksize. self.block_size is
@@ -89,9 +94,3 @@ def new(key, msg = None, digestmod = None):
     method.
     """
     return HMAC(key, msg, digestmod)
-
-# Useful ones for this project
-#import tcc
-#hmac_sha256 = lambda key, msg=None: HMAC(key, msg, tcc.sha256)
-#hmac_sha1 = lambda key, msg=None: HMAC(key, msg, tcc.sha1)
-#hmac_sha512 = lambda key, msg=None: HMAC(key, msg, tcc.sha512)

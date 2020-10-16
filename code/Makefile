@@ -5,6 +5,9 @@ all:
 	(cd ..; make)
 
 test:
+	$(PY) test_hmac.py
+	$(MPY) test_hmac.py
+	$(MPY) test_cert.py
 	$(PY) test_ec.py
 	$(MPY) test_ec.py
 	$(MPY) test_ec_sig.py

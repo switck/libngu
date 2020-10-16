@@ -1,4 +1,6 @@
 # BIP39 mnemonics
+# - should work desktop and mpy
+
 from hashlib import sha256
 
 # from https://raw.githubusercontent.com/bitcoin/bips/master/bip-0039/english.txt
@@ -275,3 +277,56 @@ def b2a_words(msg):
     assert not val
 
     return ' '.join(wordlist_en[i] for i in reversed(result))
+
+def check_words(phrase):
+    "return T if checksum works"
+    # TODO
+    
+
+def a2b_words_raw(phrase):
+    "decode, don't check checksum"
+    # TODO
+
+def a2b_words(phrase):
+    "decode, raise on back checksum"
+    # TODO
+
+def next_char(prefix):
+    # return list of chars that could follow indicated prefix, and a flag if
+    # prefix is itself a word in the list (ie. 'act'
+    # - remember: act => act, action, actor, and more
+    # - in alpha order
+    pl = len(prefix)
+    assert pl >= 1
+
+    # skip down until first char matches
+    for wn in range(0x800):
+        if wordlist_en[wn][0] == prefix[0]:
+            break
+
+    wn = 0
+    while wn < 0x800:
+        if wordlist_en[wn][0:pl] != prefix:
+            wn += 1
+            continue
+        break
+    else:
+        # prefix not in list
+        return (False, '')
+
+    exact = (wordlist_en[wn] == prefix)
+    if exact:
+        wn += 1
+
+    chars = []
+    while wn < 0x800:
+        if not wordlist_en[wn].startswith(prefix):
+            break
+
+        ch = wordlist_en[wn][pl]
+        if not chars or chars[-1] != ch:
+            chars.append(ch)
+        wn += 1
+
+    return exact, ''.join(chars)
+

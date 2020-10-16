@@ -1,6 +1,6 @@
 # this file autodetected by py/py.mk based on name
 
-SRC_USERMOD += $(addprefix $(NGU_TOP_DIR)/code/, hash.c modngu.c)
+SRC_USERMOD += $(addprefix $(NGU_TOP_DIR)/code/, hash.c modngu.c ec.c)
 
 CFLAGS_USERMOD += -I$(NGU_TOP_DIR)/code
 

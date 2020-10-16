@@ -1,7 +1,7 @@
 #!/bin/sh
 # 
 try:
-    # make the test
+    # make the test data
     from mnemonic import Mnemonic
 
     eng = Mnemonic('english')
@@ -14,6 +14,10 @@ try:
                 print('(%r, %r)' % (vector, exp), file=fd)
 
 except:
+    pass
+
+
+def test_b2a():
     import bip39
 
     # run the test
@@ -24,4 +28,21 @@ except:
         ans = bip39.b2a_words(vector)
         assert ans == expect, "(got) %r != (expected) %r " % (ans, expect)
 
-    print('PASS')
+def test_prefix():
+    import bip39
+
+    assert bip39.next_char('act') == (True, 'ioru')
+    assert bip39.next_char('dkfjh') == (False, '')
+    assert bip39.next_char('a') == (False, 'bcdefghilmnprstuvwx')
+    assert bip39.next_char('q') == (False, 'u')
+    assert bip39.next_char('qu') == (False, 'aeio')
+    assert bip39.next_char('present') == (True, '')
+    assert bip39.next_char('zoo') == (True, '')
+    assert bip39.next_char('zo') == (False, 'no')
+    
+
+
+test_b2a()
+test_prefix()
+
+print('PASS')

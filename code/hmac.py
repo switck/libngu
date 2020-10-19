@@ -12,7 +12,7 @@ class HMAC:
     """
     blocksize = 64  # 512-bit HMAC; can be changed in subclasses.
 
-    def __init__(self, key, msg = None, digestmod = None, digest_info=0):
+    def __init__(self, key, msg=None, digestmod=None, digest_info=None):
         """Create a new HMAC object.
 
         key:       key for the keyed hash object.

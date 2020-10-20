@@ -70,13 +70,13 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(parse_obj, parse);
 // Verify chain
 STATIC mp_obj_t verify_chain(mp_obj_t self_in, mp_obj_t trust_ca_in)
 {
-    // TODO: add ca_crl, profile,e tc.
+    // TODO: add ca_crl, profile, etc.
     mp_obj_cert_t *self = MP_OBJ_TO_PTR(self_in);
     if(!mp_obj_is_type(trust_ca_in, &cert_type)) {
         mp_raise_TypeError(MP_ERROR_TEXT("need trust root"));
     }
 
-    
+    // TODO
 #if 0
     mp_obj_cert_t *trust_ca = MP_OBJ_TO_PTR(trust_ca_in);
 

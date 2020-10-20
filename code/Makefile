@@ -8,7 +8,10 @@ all:
 tags:
 	(cd ..; make tags)
 
-test:
+test tests:
+	$(PY) test_codecs.py
+	$(PY) test_codecs_gen.py
+	$(MPY) test_codecs_gen.py
 	$(MPY) test_random.py
 	$(MPY) test_k1.py
 	$(PY) test_hmac.py

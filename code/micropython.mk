@@ -1,6 +1,7 @@
 # this file autodetected by py/py.mk based on its name
 
-MY_FILES = hash.c modngu.c ec.c cert.c secp256k1.c random.c
+MY_FILES = hash.c modngu.c ec.c cert.c secp256k1.c random.c base32.c codecs.c \
+			libbase58.c
 SRC_USERMOD += $(addprefix $(NGU_TOP_DIR)/code/, $(MY_FILES))
 
 CFLAGS_USERMOD += -I$(NGU_TOP_DIR)/code -I$(NGU_TOP_DIR)/libs/secp256k1/include

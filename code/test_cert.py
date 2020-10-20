@@ -68,13 +68,16 @@ bhb/2wol/McYrMp4IYoUxJo=
 import ngu
 c = ngu.cert.x509()
 c.parse(unit_cert)
-print(repr(c))
+#print(repr(c))
+assert 'Opendime' in repr(c)
+assert 'serialNumber=PEXEVEKLGRIFCICKJIYBCHQC74+cd229fbd8405' in repr(c)
 pubkey = c.get_ec_pubkey()
 assert pubkey[0] == 4 and len(pubkey) == 65
 
 c2 = ngu.cert.x509()
 c2.parse(chain_cert)
-print(repr(c2))
+#print(repr(c2))
+assert 'Coinkite Inc.' in repr(c2)
 try:
     print(c2.get_ec_pubkey())
 except TypeError:

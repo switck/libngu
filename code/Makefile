@@ -9,6 +9,7 @@ tags:
 	(cd ..; make tags)
 
 test:
+	$(MPY) test_random.py
 	$(MPY) test_k1.py
 	$(PY) test_hmac.py
 	$(MPY) test_hmac.py

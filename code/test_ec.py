@@ -43,7 +43,8 @@ import gc
 import ngu
 
 names = [i for i in dir(ngu.ec) if i[0].isupper() and i[0].isalpha]
-print("Curves: " + ', '.join(names))
+#print("Curves: " + ', '.join(names))
+assert len(names) == 3
 
 # instance each one
 for n in names:

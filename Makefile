@@ -29,7 +29,7 @@ clean:
 
 
 tags:
-	ctags -f .tags code/*.[hc] $(filter-out $(MPY_TOP)/py/dynruntime.h, $(wildcard $(MPY_TOP)/py/*.[hc])) libs/secp256k1/{src,include}/*.[hc]
+	ctags -f .tags code/*.[hc] $(filter-out $(MPY_TOP)/py/dynruntime.h, $(wildcard $(MPY_TOP)/py/*.[hc])) libs/secp256k1/{src,include}/*.[hc] libs/secp256k1/src/modules/*/*.[hc]
 
 test:
 	(cd code; make test)

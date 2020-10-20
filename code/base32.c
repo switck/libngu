@@ -28,6 +28,7 @@ int base32_decode(const uint8_t *encoded, uint8_t *result, int bufSize) {
     if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '-') {
       continue;
     }
+    if(ch == '=') break;
     buffer <<= 5;
 
     // Deal with commonly mistyped characters

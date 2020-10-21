@@ -1,17 +1,11 @@
-# Location of top-level MicroPython directory
+# Location of key submods
 MPY_TOP ?= libs/micropython
-
 S_TOP ?= libs/secp256k1
+
 LIB_SECP256K1 = $(S_TOP)/.libs/libsecp256k1.a
 
 # mac bugfix
 export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
-
-#MP_CONFIGFILE ?= $(MPY_TOP)/ports/unix/mpconfigport.h
-#CFLAGS += -I$(MPY_TOP) -I$(MPY_TOP)/ports/unix/build -DMP_CONFIGFILE="\""$(realpath $(MP_CONFIGFILE))"\""
-
-#C_FILES = modngu.c hash.c
-#OBJ_FILES = $(C_FILES:%.c=%.o)
 
 SUB_MAKE_ARGS = -j 4 VARIANT=ngu VARIANT_DIR=$(realpath var) V=$(V) \
 					USER_C_MODULES=$(realpath .) NGU_TOP_DIR=$(realpath .)
@@ -34,7 +28,9 @@ tags:
 test:
 	(cd code; make test)
 
-S_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precision=2 --enable-module-recovery
+S_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precision=2\
+				--enable-module-recovery
 
 $(LIB_SECP256K1): Makefile
 	(cd $(S_TOP); ./autogen.sh && ./configure $(S_CONF_FLAGS) && make)
+

@@ -2,11 +2,11 @@
 
 All the things needed to make Bitcoin work on embedded µpy platforms like ESP32.
 
-Name is "Number go Up" or maybe "No GnUs".
+Name is "Number Go Up" ... because need that.
 
 **Absoletely none of SHITCOINS allowed here**
 
-## Building
+## Notes
 
 - might need, [see issue](https://github.com/micropython/micropython/issues/5224)
 

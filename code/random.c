@@ -48,6 +48,29 @@ STATIC uint32_t my_yasmarang(void) {
     return yasmarang_pad ^ (yasmarang_d << 5) ^ (yasmarang_pad >> 18) ^ (yasmarang_dat << 1);
 } 
 
+void my_random_bytes(uint8_t *dest, uint32_t count)
+{
+    uint32_t last = 0;
+
+    while(count) {
+        uint32_t chip = CHIP_TRNG_32();
+
+        if(chip == last) {
+            // maybe TRNG is not clocked? Fail hard
+            mp_raise_OSError(MP_EFAULT);
+        }
+        last = chip;
+
+        chip ^= my_yasmarang();
+
+        int here = MIN(4, count);
+
+        memcpy(dest, &chip, here);
+        dest += here;
+        count -= here;
+    }
+}
+
 STATIC mp_obj_t random_uint32(void) {
     // full 32-bit values, not 30
     CHIP_TRNG_SETUP();
@@ -69,26 +92,8 @@ STATIC mp_obj_t random_bytes(mp_obj_t count_in)
 
     vstr_t rv;
     vstr_init_len(&rv, count);
-    char *p = rv.buf;
-    uint32_t last = 0;
 
-    while(count) {
-        uint32_t chip = CHIP_TRNG_32();
-
-        if(chip == last) {
-            // maybe TRNG is not clocked? Fail hard
-            mp_raise_OSError(MP_EFAULT);
-        }
-        last = chip;
-
-        chip ^= my_yasmarang();
-
-        int here = MIN(4, count);
-
-        memcpy(p, &chip, here);
-        p += here;
-        count -= here;
-    }
+    my_random_bytes((uint8_t *)rv.buf, count);
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
 }

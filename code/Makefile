@@ -13,7 +13,9 @@ test tests:
 	$(PY) test_codecs_gen.py
 	$(MPY) test_codecs_gen.py
 	$(MPY) test_random.py
+	$(PY) test_k1.py
 	$(MPY) test_k1.py
+	$(MPY) test_k1_gen.py
 	$(PY) test_hmac.py
 	$(MPY) test_hmac.py
 	$(MPY) test_cert.py

@@ -166,7 +166,7 @@ STATIC const mp_rom_map_elem_t mp_module_hash_globals_table[] = {
 
     { MP_ROM_QSTR(MP_QSTR_sha512), MP_ROM_PTR(&modngu_hash_sha512_type) },
     { MP_ROM_QSTR(MP_QSTR_ripemd160), MP_ROM_PTR(&modngu_hash_ripemd160_type) },
-    { MP_ROM_QSTR(MP_QSTR_double_sha256), MP_ROM_PTR(&double_sha256_obj) },
+    { MP_ROM_QSTR(MP_QSTR_sha256d), MP_ROM_PTR(&double_sha256_obj) },
 
 };
 

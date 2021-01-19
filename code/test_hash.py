@@ -4,7 +4,7 @@ try:
     import ngu
     sha512 = ngu.hash.sha512
     ripemd160 = ngu.hash.ripemd160
-    double_sha256 = ngu.hash.double_sha256
+    double_sha256 = ngu.hash.sha256d
 except:
     import hashlib
     from hashlib import sha512, sha256

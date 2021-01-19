@@ -23,14 +23,20 @@ clean:
 
 
 tags:
-	ctags -f .tags code/*.[hc] $(filter-out $(MPY_TOP)/py/dynruntime.h, $(wildcard $(MPY_TOP)/py/*.[hc])) libs/secp256k1/{src,include}/*.[hc] libs/secp256k1/src/modules/*/*.[hc]
+	ctags -f .tags code/*.[hc] \
+	$(filter-out $(MPY_TOP)/py/dynruntime.h, $(wildcard $(MPY_TOP)/py/*.[hc])) \
+	libs/secp256k1/{src,include}/*.[hc] \
+	libs/secp256k1/src/modules/*/*.[hc] \
+	libs/micropython/lib/mbedtls/include/mbedtls/*.h \
+	libs/micropython/lib/mbedtls/crypto/library/*.c
 
 test:
 	(cd code; make test)
 
 S_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precision=2\
-				--enable-module-recovery
+				--enable-module-recovery --enable-module-extrakeys --enable-experimental
 
-$(LIB_SECP256K1): Makefile
+#$(LIB_SECP256K1): Makefile		# XXX
+$(LIB_SECP256K1): 
 	(cd $(S_TOP); ./autogen.sh && ./configure $(S_CONF_FLAGS) && make)
 

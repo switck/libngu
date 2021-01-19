@@ -13,6 +13,7 @@
 #if MICROPY_SSL_MBEDTLS
 #include "mbedtls/ripemd160.h"
 #include "mbedtls/sha512.h"
+#include "mbedtls/sha256.h"
 #else
 # error "requires MBEDTLS"
 #endif
@@ -110,6 +111,7 @@ STATIC mp_obj_t modngu_hash_ripemd160_update(mp_obj_t self_in, mp_obj_t arg) {
     mbedtls_ripemd160_update_ret((mbedtls_ripemd160_context *)self->state, bufinfo.buf, bufinfo.len);
     return mp_const_none;
 }
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(modngu_hash_ripemd160_update_obj, modngu_hash_ripemd160_update);
 
 STATIC mp_obj_t modngu_hash_ripemd160_digest(mp_obj_t self_in) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
@@ -121,8 +123,6 @@ STATIC mp_obj_t modngu_hash_ripemd160_digest(mp_obj_t self_in) {
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
-
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(modngu_hash_ripemd160_update_obj, modngu_hash_ripemd160_update);
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(modngu_hash_ripemd160_digest_obj, modngu_hash_ripemd160_digest);
 
 STATIC const mp_rom_map_elem_t modngu_hash_ripemd160_locals_dict_table[] = {
@@ -138,12 +138,35 @@ STATIC const mp_obj_type_t modngu_hash_ripemd160_type = {
     .locals_dict = (void *)&modngu_hash_ripemd160_locals_dict,
 };
 
+// Double sha256 = sha256(sha256('foo').digest()).digest() ... in one step
+STATIC mp_obj_t double_sha256(mp_obj_t arg) {
+    mp_buffer_info_t inp;
+    mp_get_buffer_raise(arg, &inp, MP_BUFFER_READ);
+
+    vstr_t vstr;
+    vstr_init_len(&vstr, 32);
+
+    mbedtls_sha256_context ctx;
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts_ret(&ctx, 0);
+    mbedtls_sha256_update_ret(&ctx, (uint8_t *)inp.buf, inp.len);
+    mbedtls_sha256_finish_ret(&ctx, (uint8_t *)vstr.buf);
+
+    mbedtls_sha256_starts_ret(&ctx, 0);
+    mbedtls_sha256_update_ret(&ctx, (uint8_t *)vstr.buf, 32);
+    mbedtls_sha256_finish_ret(&ctx, (uint8_t *)vstr.buf);
+    
+    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(double_sha256_obj, double_sha256);
+
 
 STATIC const mp_rom_map_elem_t mp_module_hash_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_hash) },
 
     { MP_ROM_QSTR(MP_QSTR_sha512), MP_ROM_PTR(&modngu_hash_sha512_type) },
     { MP_ROM_QSTR(MP_QSTR_ripemd160), MP_ROM_PTR(&modngu_hash_ripemd160_type) },
+    { MP_ROM_QSTR(MP_QSTR_double_sha256), MP_ROM_PTR(&double_sha256_obj) },
 
 };
 

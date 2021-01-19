@@ -16,9 +16,9 @@ try:
 except:
     pass
 
+import bip39
 
 def test_b2a():
-    import bip39
 
     # run the test
     for ln in open('b39-data.txt', 'rt').readlines():
@@ -28,8 +28,20 @@ def test_b2a():
         ans = bip39.b2a_words(vector)
         assert ans == expect, "(got) %r != (expected) %r " % (ans, expect)
 
+def test_a2b():
+    for ln in open('b39-data.txt', 'rt').readlines():
+        value, words = eval(ln)
+        got = bip39.a2b_words(words)
+        assert got == value
+
+def test_guessing():
+    for ln in open('b39-data.txt', 'rt').readlines():
+        value, words = eval(ln)
+        words = words.split()
+        maybe = bip39.a2b_words_guess(words[:-1])
+        assert words[-1] in maybe, '%r not in %r' % (words[-1], maybe)
+
 def test_prefix():
-    import bip39
 
     assert bip39.next_char('act') == (True, 'ioru')
     assert bip39.next_char('dkfjh') == (False, '')
@@ -44,5 +56,7 @@ def test_prefix():
 
 test_b2a()
 test_prefix()
+test_a2b()
+test_guessing()
 
 print('PASS')

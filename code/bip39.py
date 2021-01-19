@@ -278,22 +278,69 @@ def b2a_words(msg):
 
     return ' '.join(wordlist_en[i] for i in reversed(result))
 
-def check_words(phrase):
-    "return T if checksum works"
-    # TODO
-    
 
-def a2b_words_raw(phrase):
-    "decode, don't check checksum"
-    # TODO
+def _split_lookup(phrase):
+    "decode & lookup only"
+
+    if isinstance(phrase, str):
+        phrase = phrase.split()
+
+    num = len(phrase)
+
+    rv = 0
+    for w in phrase:
+        idx = wordlist_en.index(w)
+        if idx < 0:
+            raise ValueError(w)
+
+        rv = (rv << 11) | idx
+
+    return num, rv
 
 def a2b_words(phrase):
-    "decode, raise on back checksum"
-    # TODO
+    "decode, raise on bad checksum"
+
+    num, rv = _split_lookup(phrase)
+
+    if num not in { 12, 15, 18, 21, 24 }:
+        raise ValueError("length")
+
+    chk_w = num // 3
+    chk_msk = 1 << chk_w
+    width = ((num * 11) - chk_w) // 8
+    rv, chksum = divmod(rv, chk_msk)
+
+    bits = rv.to_bytes(width, 'big')
+
+    expect = sha256(bits).digest()[0] >> (8-chk_w)
+
+    if expect != chksum:
+        raise ValueError('checksum fail')
+
+    return bits
+
+def a2b_words_guess(phrase):
+    "generate a list of possible final words"
+    num, rv = _split_lookup(phrase)
+
+    if num not in { 11, 14, 17, 20, 23 }:
+        return
+
+    # assume one more word missing
+    chk_w = (num+1) // 3
+    width = (((num+1) * 11) - chk_w) // 8
+    prv = rv << (11-chk_w)
+
+    for i in range(1<<(11-chk_w)):
+        rv = prv | i
+        bits = rv.to_bytes(width, 'big')
+        chk = sha256(bits).digest()[0] >> (8-chk_w)
+        yield wordlist_en[(i<<chk_w) + chk]
+
 
 def next_char(prefix):
     # return list of chars that could follow indicated prefix, and a flag if
-    # prefix is itself a word in the list (ie. 'act'
+    # prefix is itself a word in the list (ie. 'act')
     # - remember: act => act, action, actor, and more
     # - in alpha order
     pl = len(prefix)

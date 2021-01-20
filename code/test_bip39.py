@@ -43,14 +43,24 @@ def test_guessing():
 
 def test_prefix():
 
-    assert bip39.next_char('act') == (True, 'ioru')
-    assert bip39.next_char('dkfjh') == (False, '')
-    assert bip39.next_char('a') == (False, 'bcdefghilmnprstuvwx')
-    assert bip39.next_char('q') == (False, 'u')
-    assert bip39.next_char('qu') == (False, 'aeio')
-    assert bip39.next_char('present') == (True, '')
-    assert bip39.next_char('zoo') == (True, '')
-    assert bip39.next_char('zo') == (False, 'no')
+    assert bip39.next_char('act') == (True, 'ioru', None)
+    assert bip39.next_char('dkfjh') == (False, '', None)
+    assert bip39.next_char('a') == (False, 'bcdefghilmnprstuvwx', None)
+    assert bip39.next_char('q') == (False, 'u', None)
+    assert bip39.next_char('qu') == (False, 'aeio', None)
+    assert bip39.next_char('present') == (True, '', 'present')
+    assert bip39.next_char('zoo') == (True, '', 'zoo')
+    assert bip39.next_char('zo') == (False, 'no', None)
+
+    wl = bip39.wordlist_en
+    for w in wl:
+        ex, nexts, final = bip39.next_char(w[0:4])
+        if len(w) < 4:
+            assert ex == True
+            assert final in {w, None}           # act vs. aim
+        else:
+            assert ex == (len(w) == 4)
+            assert final == w
     
 
 

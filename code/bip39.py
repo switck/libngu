@@ -340,9 +340,9 @@ def a2b_words_guess(phrase):
 
 def next_char(prefix):
     # return list of chars that could follow indicated prefix, and a flag if
-    # prefix is itself a word in the list (ie. 'act')
+    # prefix is itself a word in the list (ie. 'act'), plus single match if only one
     # - remember: act => act, action, actor, and more
-    # - in alpha order
+    # - first 4 chars are unique
     pl = len(prefix)
     assert pl >= 1
 
@@ -359,21 +359,31 @@ def next_char(prefix):
         break
     else:
         # prefix not in list
-        return (False, '')
+        return (False, '', None)
 
+
+    first = None
+    count = 0
     exact = (wordlist_en[wn] == prefix)
+    if pl >= 4:
+        return (exact, '', wordlist_en[wn])
     if exact:
+        count = 1
         wn += 1
+        first = prefix
 
     chars = []
     while wn < 0x800:
         if not wordlist_en[wn].startswith(prefix):
             break
 
+        if not count:
+            first = wordlist_en[wn]
+        count += 1
         ch = wordlist_en[wn][pl]
         if not chars or chars[-1] != ch:
             chars.append(ch)
         wn += 1
 
-    return exact, ''.join(chars)
+    return exact, ''.join(chars), (first if count == 1 else None)
 

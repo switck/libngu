@@ -347,9 +347,10 @@ def next_char(prefix):
     assert pl >= 1
 
     # skip down until first char matches
-    for wn in range(0x800):
-        if wordlist_en[wn][0] == prefix[0]:
-            break
+    # XXX 30% slower
+    #for wn in range(0x800):
+        #if wordlist_en[wn][0] == prefix[0]:
+            #break
 
     wn = 0
     while wn < 0x800:
@@ -386,4 +387,14 @@ def next_char(prefix):
         wn += 1
 
     return exact, ''.join(chars), (first if count == 1 else None)
+
+def master_secret(words, pw=b''):
+    # BIP-39 binary + passphrase =>  master secret for bip32
+    salt = b'mnemonic' + pw
+    try:
+        import ngu
+        return ngu.hash.pbkdf2_sha512(words, salt, 2048)
+    except ImportError:
+        import wallycore 
+        return wallycore.pbkdf2_hmac_sha512(words, salt, 0, 2048)
 

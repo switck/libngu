@@ -17,3 +17,5 @@ Name is "Number Go Up" ... because need that.
 
     ./configure --enable-module-recovery --with-bignum=no
 
+- libwally-core used for testing only
+

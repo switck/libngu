@@ -9,6 +9,9 @@ tags:
 	(cd ..; make tags)
 
 test tests:
+	$(PY) test_hash.py
+	$(MPY) test_hash.py
+	$(MPY) test_hash_gen.py
 	$(PY) test_codecs.py
 	$(PY) test_codecs_gen.py
 	$(MPY) test_codecs_gen.py
@@ -24,5 +27,3 @@ test tests:
 	$(MPY) test_ec_sig.py
 	$(PY) test_bip39.py
 	$(MPY) test_bip39.py
-	$(PY) test_hash.py
-	$(MPY) test_hash.py

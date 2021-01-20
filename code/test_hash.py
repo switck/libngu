@@ -5,11 +5,27 @@ try:
     sha512 = ngu.hash.sha512
     ripemd160 = ngu.hash.ripemd160
     double_sha256 = ngu.hash.sha256d
-except:
+except ImportError:
     import hashlib
     from hashlib import sha512, sha256
     ripemd160 = lambda x=b'': hashlib.new('ripemd160', x)
     double_sha256 = lambda x: sha256(sha256(x).digest()).digest()
+
+    # gen tests
+    import wallycore as w
+    with open('test_hash_gen.py', 'wt') as fd:
+        print("import ngu; F = ngu.hash.pbkdf2_sha512", file=fd)
+        for pw, salt, rounds in [ 
+                (b'abc', b'def', 300), 
+                (b'abc'*20, b'def'*20, 3000), 
+                (b'a', b'd', 30), 
+                (b'a', b'd', 30), 
+            ]:
+            expect = w.pbkdf2_hmac_sha512(pw, salt, 0, rounds)
+            print("assert F(%r, %r, %d) == %r" % (pw, salt, rounds, bytes(expect)), file=fd)
+
+        print("print('PASS')", file=fd)
+        print("run code now in: %s" % fd.name)
 
 def expect(func, msg, dig):
     assert str(b2a_hex(func(msg).digest()), 'ascii') == dig

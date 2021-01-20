@@ -36,7 +36,10 @@ test:
 S_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precision=2\
 				--enable-module-recovery --enable-module-extrakeys --enable-experimental
 
-#$(LIB_SECP256K1): Makefile		# XXX
+#$(LIB_SECP256K1): Makefile		# XXX broken
 $(LIB_SECP256K1): 
 	(cd $(S_TOP); ./autogen.sh && ./configure $(S_CONF_FLAGS) && make)
 
+.PHONY: one-time
+one-time: $(LIB_SECP256K1)
+	

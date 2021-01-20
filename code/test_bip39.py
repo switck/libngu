@@ -18,6 +18,16 @@ except:
 
 import bip39
 
+def test_vectors():
+    import json
+    from binascii import a2b_hex, b2a_hex
+    eng = json.load(open('b39-vectors.json'))['english']
+    for raw, words, ms, _ in eng:
+        assert bip39.a2b_words(words) == a2b_hex(raw)
+        got = bip39.master_secret(words.encode('utf'), b'TREZOR')
+        assert got == a2b_hex(ms)
+        
+
 def test_b2a():
 
     # run the test
@@ -63,10 +73,10 @@ def test_prefix():
             assert final == w
     
 
-
+test_vectors()
 test_b2a()
-test_prefix()
 test_a2b()
+test_prefix()
 test_guessing()
 
 print('PASS')

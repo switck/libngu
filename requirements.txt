@@ -3,4 +3,5 @@ pytest
 pycoin
 mnemonic
 ecdsa>=0.13
+wallycore==0.8.1
 

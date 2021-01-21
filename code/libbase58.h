@@ -27,7 +27,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-extern bool (*b58_sha256_impl)(void *, const void *, size_t);
+//extern bool (*b58_sha256_impl)(void *, const void *, size_t);
+extern bool b58_sha256_impl(void *, const void *, size_t);
 
 int base58_encode_check(const uint8_t *data, int len, char *str, int strsize);
 int base58_decode_check(const char *str, uint8_t *data, int datalen);

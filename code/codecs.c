@@ -6,8 +6,8 @@
 #include "py/runtime.h"
 #include "py/mperrno.h"
 #include <string.h>
-#include <assert.h>
 #include <stdio.h>
+#include "my_assert.h"
 
 #if MICROPY_SSL_MBEDTLS
 # include "mbedtls/sha256.h"
@@ -53,9 +53,11 @@ STATIC mp_obj_t c_b32encode(mp_obj_t arg_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b32encode_obj, c_b32encode);
 
 // 
-// Base 58 - always with checksum, never with prefix
+// Base 58 - always with checksum, never with a particular prefix
 // 
-bool ref_sha256(void *out, const void *inp, size_t len)
+
+// for libbase58 to call
+bool b58_sha256_impl(void *out, const void *inp, size_t len)
 {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
@@ -70,7 +72,6 @@ STATIC mp_obj_t c_b58decode(mp_obj_t arg_in)
 {
     uint8_t tmp[128];
 
-    b58_sha256_impl = ref_sha256;
     int len_out = base58_decode_check(mp_obj_str_get_str(arg_in), tmp, sizeof(tmp));
     if(len_out <= 0) {
         mp_raise_ValueError(NULL);
@@ -88,7 +89,6 @@ STATIC mp_obj_t c_b58encode(mp_obj_t arg_in)
 
     char tmp[128];
 
-    b58_sha256_impl = ref_sha256;
     int len_out = base58_encode_check(buf.buf, buf.len, tmp, sizeof(tmp));
     if(len_out <= 0) {
         mp_raise_ValueError(NULL);

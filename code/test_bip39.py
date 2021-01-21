@@ -24,7 +24,7 @@ def test_vectors():
     eng = json.load(open('b39-vectors.json'))['english']
     for raw, words, ms, _ in eng:
         assert bip39.a2b_words(words) == a2b_hex(raw)
-        got = bip39.master_secret(words.encode('utf'), b'TREZOR')
+        got = bip39.master_secret(words.encode('utf'), a2b_hex('5452455a4f52'))
         assert got == a2b_hex(ms)
         
 

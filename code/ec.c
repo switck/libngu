@@ -6,9 +6,9 @@
 //
 #include "py/runtime.h"
 #include <string.h>
-#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "my_assert.h"
 
 #if MICROPY_SSL_MBEDTLS
 #include "mbedtls/ecp.h"

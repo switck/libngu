@@ -9,13 +9,11 @@
 #include "py/runtime.h"
 #include "random.h"
 #include <string.h>
-#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "my_assert.h"
 
-#include "secp256k1.h"
-#include "secp256k1_recovery.h"
-#include "secp256k1_extrakeys.h"
+#include "sec_shared.h"
 
 typedef struct  {
     mp_obj_base_t base;
@@ -49,9 +47,11 @@ static void s_error_cb(const char* message, void* data)
     mp_raise_ValueError(message);
 }
 
-// big heavy shared object for all calls
-static void _setup_ctx(void)
+// make big heavy shared object for all calls
+void sec_setup_ctx(void)
 {
+    if(lib_ctx) return;
+
     lib_ctx = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY 
                                             | SECP256K1_CONTEXT_SIGN
                                             | SECP256K1_CONTEXT_DECLASSIFY);
@@ -70,7 +70,7 @@ STATIC mp_obj_t s_sig_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
     mp_obj_sig_t *o = m_new_obj(mp_obj_sig_t);
     o->base.type = type;
 
-    if(!lib_ctx) _setup_ctx();
+    sec_setup_ctx();
 
     mp_buffer_info_t inp;
     mp_get_buffer_raise(args[0], &inp, MP_BUFFER_READ);
@@ -102,7 +102,7 @@ STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size
     mp_obj_pubkey_t *o = m_new_obj(mp_obj_pubkey_t);
     o->base.type = type;
 
-    if(!lib_ctx) _setup_ctx();
+    sec_setup_ctx();
 
     mp_buffer_info_t inp;
     mp_get_buffer_raise(args[0], &inp, MP_BUFFER_READ);
@@ -120,7 +120,7 @@ STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size
 STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     mp_obj_pubkey_t *self = MP_OBJ_TO_PTR(args[0]);
 
-    if(!lib_ctx) _setup_ctx();
+    sec_setup_ctx();
 
     vstr_t vstr;
     vstr_init_len(&vstr, 66);
@@ -145,7 +145,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_pubkey_to_bytes_obj, 1, 2, s_pubkey
 STATIC mp_obj_t s_sig_to_bytes(mp_obj_t self_in) {
     mp_obj_sig_t *self = MP_OBJ_TO_PTR(self_in);
 
-    if(!lib_ctx) _setup_ctx();
+    sec_setup_ctx();
 
     int recid = 0;
     vstr_t vstr;
@@ -189,7 +189,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_sig_verify_recover_obj, s_sig_verify_recover)
 
 STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in)
 {
-    if(!lib_ctx) _setup_ctx();
+    sec_setup_ctx();
 
     mp_buffer_info_t digest;
     mp_get_buffer_raise(digest_in, &digest, MP_BUFFER_READ);
@@ -234,7 +234,7 @@ STATIC mp_obj_t s_keypair_make_new(const mp_obj_type_t *type, size_t n_args, siz
     mp_obj_keypair_t *o = m_new_obj(mp_obj_keypair_t);
     o->base.type = type;
 
-    if(!lib_ctx) _setup_ctx();
+    sec_setup_ctx();
 
     if(n_args == 0) {
         // pick random key
@@ -277,7 +277,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_privkey_obj, s_keypair_privkey);
 STATIC mp_obj_t s_keypair_pubkey(mp_obj_t self_in) {
     mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
 
-    if(!lib_ctx) _setup_ctx();
+    sec_setup_ctx();
 
     // no need to cache, already done by keypair code
     mp_obj_pubkey_t *rv = m_new_obj(mp_obj_pubkey_t);

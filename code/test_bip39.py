@@ -1,5 +1,3 @@
-#!/bin/sh
-# 
 try:
     # make the test data
     from mnemonic import Mnemonic

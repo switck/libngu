@@ -9,7 +9,9 @@ tags:
 	(cd ..; make tags)
 
 test tests:
+	$(PY) test_hdnode.py
 	$(MPY) test_hdnode.py
+	$(MPY) test_hdnode_gen.py
 	$(PY) test_hash.py
 	$(MPY) test_hash.py
 	$(MPY) test_hash_gen.py

@@ -3,10 +3,12 @@
 # undef assert
 # define assert(e)      ((void) ((e) ? ((void)0) : my_assert(__FILE__, __LINE__)))
 
-extern void my_assert(const char *fname, int line_num);
+extern void my_assert(const char *fname, int line_num) __attribute__((noreturn));
 
 #else
 # include <assert.h>
 #endif
 
+// Checked at compile time. Thanks GCC
+#define STATIC_ASSERT(e)		_Static_assert(e, #e)
 

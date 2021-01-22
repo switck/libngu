@@ -156,6 +156,7 @@ STATIC mp_obj_t double_sha256(mp_obj_t arg) {
     mbedtls_sha256_starts_ret(&ctx, 0);
     mbedtls_sha256_update_ret(&ctx, (uint8_t *)vstr.buf, 32);
     mbedtls_sha256_finish_ret(&ctx, (uint8_t *)vstr.buf);
+    mbedtls_sha256_free(&ctx);
     
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }

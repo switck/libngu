@@ -18,7 +18,7 @@ except ImportError:
         for pw, salt, rounds in [ 
                 (b'abc', b'def', 300), 
                 (b'abc'*20, b'def'*20, 3000), 
-                (b'a', b'd', 30), 
+                (b'\x01\x03\x04\x05\x06', b'\x04\x03\x02\x01\x00', 30), 
                 (b'a', b'd', 30), 
             ]:
             expect = w.pbkdf2_hmac_sha512(pw, salt, 0, rounds)

@@ -64,6 +64,13 @@ static inline uint32_t read_be32(uint8_t **p)
     return (v[0] << 24) | (v[1] << 16) | (v[2] << 8) | v[3];
 }
 
+static inline void raise_on_invalid(mp_obj_hdnode_t *n)
+{
+    if(n->depth < 0) {
+        mp_raise_msg(&mp_type_ValueError, MP_ERROR_TEXT("invalid HDNode"));
+    }
+}
+
 void _calc_pubkey(mp_obj_hdnode_t *self)
 {
     // calc based on privkey
@@ -128,9 +135,21 @@ STATIC mp_obj_t s_hdnode_make_new(const mp_obj_type_t *type, size_t n_args, size
 
 
 // METHODS
+STATIC mp_obj_t s_hdnode_copy(mp_obj_t self_in) {
+    mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
+
+    mp_obj_hdnode_t *rv = m_new_obj(mp_obj_hdnode_t);
+    *rv = *self;
+    rv->base.type = &s_hdnode_type;
+    
+    return rv;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_copy_obj, s_hdnode_copy);
 
 STATIC mp_obj_t s_hdnode_privkey(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     vstr_t vstr;
     vstr_init_len(&vstr, 32);
@@ -144,8 +163,10 @@ STATIC mp_obj_t s_hdnode_privkey(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_privkey_obj, s_hdnode_privkey);
 
+
 STATIC mp_obj_t s_hdnode_pubkey(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     vstr_t vstr;
     vstr_init_len(&vstr, 33);
@@ -166,6 +187,7 @@ STATIC mp_obj_t s_hdnode_serialize(mp_obj_t self_in, mp_obj_t version_in, mp_obj
     //  private: flag, exporting private key else public part
     // result is base58 bytes
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     uint32_t version = mp_obj_get_int(version_in);
     bool want_private = !!mp_obj_get_int_truncated(want_private_in);
@@ -287,6 +309,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_hdnode_from_master_obj, s_hdnode_from_master)
 
 STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     uint32_t next_child = mp_obj_get_int(next_child_in);
     uint32_t parent_fp = _calc_my_fp(self);
@@ -306,7 +329,7 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
 
     // food for HMAC-SHA512
     uint8_t     work[33+4], *p=work;
-    if(self->have_private) {
+    if(hard) {
         *(p++) = 0x0;
         memcpy(p, self->privkey, 32); p += 32;
     } else {
@@ -320,8 +343,7 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
 
     int ok;
     if(self->have_private) {
-        // Ileft + k(mod n)
-        ok = secp256k1_ec_privkey_tweak_add(lib_ctx, I.lr.left, self->privkey);
+        ok = secp256k1_ec_privkey_tweak_add(lib_ctx, self->privkey, I.lr.left);
         if(!ok) goto fail;
 
         if(!hard) {
@@ -347,11 +369,6 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
         self->have_public = true;
     }
 
-    if(!hard) {
-        self->have_private = false;
-        memset(self->privkey, 0, 32);
-    }
-
     memcpy(self->chain_code, I.lr.right, 32);
     self->depth += 1;
     self->child_num = next_child;
@@ -370,6 +387,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_hdnode_derive_obj, s_hdnode_derive);
 
 STATIC mp_obj_t s_hdnode_depth(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     return MP_OBJ_NEW_SMALL_INT(self->depth);
 }
@@ -377,6 +395,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_depth_obj, s_hdnode_depth);
 
 STATIC mp_obj_t s_hdnode_parent_fp(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     return mp_obj_new_int(self->parent_fp);
 }
@@ -384,6 +403,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_parent_fp_obj, s_hdnode_parent_fp);
 
 STATIC mp_obj_t s_hdnode_my_fp(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     uint32_t rv = _calc_my_fp(self);
 
@@ -393,6 +413,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_my_fp_obj, s_hdnode_my_fp);
 
 STATIC mp_obj_t s_hdnode_child_number(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
 
     return mp_obj_new_int(self->child_num);
 }
@@ -412,6 +433,8 @@ STATIC const mp_rom_map_elem_t s_hdnode_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_child_number), MP_ROM_PTR(&s_hdnode_child_number_obj) },
     { MP_ROM_QSTR(MP_QSTR_parent_fp), MP_ROM_PTR(&s_hdnode_parent_fp_obj) },
     { MP_ROM_QSTR(MP_QSTR_my_fp), MP_ROM_PTR(&s_hdnode_my_fp_obj) },
+
+    { MP_ROM_QSTR(MP_QSTR_copy), MP_ROM_PTR(&s_hdnode_copy_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(s_hdnode_locals_dict, s_hdnode_locals_dict_table);
 

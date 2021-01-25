@@ -14,6 +14,7 @@
 #include "my_assert.h"
 
 #include "sec_shared.h"
+#include "mbedtls/sha256.h"
 
 typedef struct  {
     mp_obj_base_t base;
@@ -265,7 +266,7 @@ STATIC mp_obj_t s_keypair_make_new(const mp_obj_type_t *type, size_t n_args, siz
 }
 
 
-// METHODS
+// keypair METHODS
 
 STATIC mp_obj_t s_keypair_privkey(mp_obj_t self_in) {
     mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
@@ -291,6 +292,48 @@ STATIC mp_obj_t s_keypair_pubkey(mp_obj_t self_in) {
     return rv;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_pubkey_obj, s_keypair_pubkey);
+
+static int _my_ecdh_hash(unsigned char *output, const unsigned char *x32, const unsigned char *y32, void *data) {
+    (void)data;
+
+    mbedtls_sha256_context ctx;
+
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts_ret(&ctx, 0);
+    mbedtls_sha256_update_ret(&ctx, x32, 32);
+    mbedtls_sha256_update_ret(&ctx, y32, 32);
+    mbedtls_sha256_finish_ret(&ctx, output);
+    mbedtls_sha256_free(&ctx);
+
+    return 1;
+}
+
+STATIC mp_obj_t s_keypair_ecdh_multiply(mp_obj_t self_in, mp_obj_t other_point_in) {
+    mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
+
+    // returns sha256(pubkey64(privkey * other_pubkey_point))
+    sec_setup_ctx();
+
+    mp_buffer_info_t inp;
+    mp_get_buffer_raise(other_point_in, &inp, MP_BUFFER_READ);
+
+    secp256k1_pubkey    other_point;
+    int ok = secp256k1_ec_pubkey_parse(lib_ctx, &other_point, inp.buf, inp.len);
+    if(!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_parse"));
+    }
+
+    vstr_t rv;
+    vstr_init_len(&rv, 32);
+
+    ok = secp256k1_ecdh(lib_ctx, (uint8_t *)rv.buf, &other_point, self->privkey, _my_ecdh_hash, NULL);
+    if(!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ecdh"));
+    }
+
+    return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_ecdh_multiply_obj, s_keypair_ecdh_multiply);
 
 
 // sigs and what you can do with them
@@ -325,6 +368,7 @@ STATIC const mp_obj_type_t s_pubkey_type = {
 STATIC const mp_rom_map_elem_t s_keypair_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_privkey), MP_ROM_PTR(&s_keypair_privkey_obj) },
     { MP_ROM_QSTR(MP_QSTR_pubkey), MP_ROM_PTR(&s_keypair_pubkey_obj) },
+    { MP_ROM_QSTR(MP_QSTR_ecdh_multiply), MP_ROM_PTR(&s_keypair_ecdh_multiply_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(s_keypair_locals_dict, s_keypair_locals_dict_table);
 

@@ -3,16 +3,27 @@ try:
     from ecdsa import SigningKey
     from ecdsa.util import sigencode_string
     from ecdsa.curves import SECP256k1
+    from ecdsa.util import number_to_string
     from hashlib import sha256
+
+    my_k = SigningKey.from_string(b'za'*16, curve=SECP256k1, hashfunc=sha256)
 
     with open('test_k1_gen.py', 'wt') as fd:
         print("import gc, ngu  # auto-gen", file=fd)
+        print("my_pubkey = b'\\x04' + %r" % my_k.get_verifying_key().to_string(), file=fd)
 
         for pk in [b'12'*16, b'\x0f'+(b'\xff'*31), bytes(31)+b'\x01']:
             key = SigningKey.from_string(pk, curve=SECP256k1, hashfunc=sha256)
             expect = key.get_verifying_key().to_string('compressed')
             print('x = ngu.secp256k1.keypair(%r)' % pk, file=fd)
             print('assert x.pubkey().to_bytes() == %r\n\n' % expect, file=fd)
+
+            # ECDH
+            pt = my_k.privkey.secret_multiplier * key.get_verifying_key().pubkey.point
+            kk = number_to_string(pt.x(), SECP256k1.order) \
+                                    + number_to_string(pt.y(), SECP256k1.order)
+            md = sha256(kk).digest()
+            print('assert x.ecdh_multiply(my_pubkey) == %r\n\n' % md, file=fd)
 
         print("print('PASS')", file=fd)
         print("run code now in: %s" % fd.name)

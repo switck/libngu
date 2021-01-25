@@ -16,14 +16,14 @@
 
 typedef struct  {
     mp_obj_base_t       base;
+    uint8_t             chain_code[32];
     uint8_t             privkey[32];
     uint8_t             pubkey[33];
+    uint8_t             hash160[20];
     int                 depth;
     uint32_t            child_num;
     uint32_t            parent_fp;
-    uint8_t             chain_code[32];
     bool                have_private;
-    bool                have_public;
 } mp_obj_hdnode_t;
 
 STATIC const mp_obj_type_t s_hdnode_type;
@@ -66,7 +66,10 @@ static inline uint32_t read_be32(uint8_t **p)
 
 static inline void raise_on_invalid(mp_obj_hdnode_t *n)
 {
-    if(n->depth < 0) {
+    if(
+        (n->depth < 0)
+        || ((n->pubkey[0] != 0x02) && (n->pubkey[0] != 0x03))
+    ) {
         mp_raise_msg(&mp_type_ValueError, MP_ERROR_TEXT("invalid HDNode"));
     }
 }
@@ -80,8 +83,7 @@ void _calc_pubkey(mp_obj_hdnode_t *self)
 
     secp256k1_pubkey    pub;
     int rv = secp256k1_ec_pubkey_create(lib_ctx, &pub, self->privkey);
-
-    if(!rv) mp_raise_msg(&mp_type_RuntimeError, NULL);
+    if(!rv) mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("bip32 lottery winner"));
 
     size_t outlen = sizeof(self->pubkey);
     rv = secp256k1_ec_pubkey_serialize(lib_ctx,
@@ -90,16 +92,11 @@ void _calc_pubkey(mp_obj_hdnode_t *self)
 
     if(!rv) mp_raise_msg(&mp_type_RuntimeError, NULL);
     assert(outlen == sizeof(self->pubkey));
-
-    self->have_public = true;
 }
 
-uint32_t _calc_my_fp(mp_obj_hdnode_t *self)
-{
-    if(!self->have_public) {
-        _calc_pubkey(self);
-    }
 
+void _calc_hash160(mp_obj_hdnode_t *self)
+{
     uint8_t tmp[32];
 
     mbedtls_sha256_context ctx;
@@ -113,17 +110,20 @@ uint32_t _calc_my_fp(mp_obj_hdnode_t *self)
     mbedtls_ripemd160_init(&r_ctx);
     mbedtls_ripemd160_starts_ret(&r_ctx);
     mbedtls_ripemd160_update_ret(&r_ctx, tmp, 32);
-    mbedtls_ripemd160_finish_ret(&r_ctx, tmp);
+    mbedtls_ripemd160_finish_ret(&r_ctx, self->hash160);
     mbedtls_ripemd160_free(&r_ctx);
+}
 
-    uint8_t *p = tmp;
+uint32_t _calc_my_fp(mp_obj_hdnode_t *self)
+{
+    uint8_t *p = self->hash160;
     return read_be32(&p);
 }
 
 // Constructor: makes empty/invalid obj
 STATIC mp_obj_t s_hdnode_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, 0, false);
-    mp_obj_hdnode_t *o = m_new_obj(mp_obj_hdnode_t);
+    mp_obj_hdnode_t *o = m_new_obj_with_finaliser(mp_obj_hdnode_t);
 
     memset(o, 0, sizeof(mp_obj_hdnode_t));
     o->base.type = type;
@@ -139,13 +139,24 @@ STATIC mp_obj_t s_hdnode_copy(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
     raise_on_invalid(self);
 
-    mp_obj_hdnode_t *rv = m_new_obj(mp_obj_hdnode_t);
+    mp_obj_hdnode_t *rv = m_new_obj_with_finaliser(mp_obj_hdnode_t);
     *rv = *self;
     rv->base.type = &s_hdnode_type;
     
     return rv;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_copy_obj, s_hdnode_copy);
+
+STATIC mp_obj_t s_hdnode_blank(mp_obj_t self_in) {
+    mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+
+    memset(self, 0, sizeof(mp_obj_hdnode_t));
+    self->base.type = &s_hdnode_type;
+    self->depth = -1;          // mark invalid
+    
+    return self_in;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_blank_obj, s_hdnode_blank);
 
 STATIC mp_obj_t s_hdnode_privkey(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
@@ -172,14 +183,35 @@ STATIC mp_obj_t s_hdnode_pubkey(mp_obj_t self_in) {
     vstr_init_len(&vstr, 33);
 
     // 33 bytes of pubkey
-    if(!self->have_public) {
-        _calc_pubkey(self);
-    }
     memcpy(vstr.buf, self->pubkey, sizeof(self->pubkey));
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_pubkey_obj, s_hdnode_pubkey);
+
+STATIC mp_obj_t s_hdnode_addr_help(size_t n_args, const mp_obj_t *args) {
+
+    mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(args[0]);
+    raise_on_invalid(self);
+
+    // ripemd160 over pubkey, but prefix with user-supplied value,
+    // and then base58... or just just the ripemd part if no prefix given
+    if(n_args < 2) {
+        return mp_obj_new_bytes((uint8_t *)self->hash160, 20);
+    }
+
+    uint8_t     work[21];
+    work[0] = mp_obj_get_int(args[1]);
+    memcpy(&work[1], self->hash160, 20);
+
+    char tmp[128];
+    int len_out = base58_encode_check(work, 21, tmp, sizeof(tmp));
+    if(len_out <= 0) {
+        mp_raise_ValueError(NULL);
+    }
+    return mp_obj_new_str(tmp, len_out-1);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_hdnode_addr_help_obj, 1, 2, s_hdnode_addr_help);
 
 STATIC mp_obj_t s_hdnode_serialize(mp_obj_t self_in, mp_obj_t version_in, mp_obj_t want_private_in) {
     // output BIP32 bytes
@@ -211,11 +243,6 @@ STATIC mp_obj_t s_hdnode_serialize(mp_obj_t self_in, mp_obj_t version_in, mp_obj
         p += 32;
     } else {
         // 33 bytes of pubkey
-        if(!self->have_public) {
-            _calc_pubkey(self);
-        }
-
-        assert(self->have_public);
         memcpy(p, self->pubkey, 33);
         p += 33;
     }
@@ -240,7 +267,7 @@ printf("\n");
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_hdnode_serialize_obj, s_hdnode_serialize);
 
 STATIC mp_obj_t s_hdnode_deserialize(mp_obj_t self_in, mp_obj_t encoded) {
-    // deserialize into self, works from base58; returns version
+    // deserialize into self, works from base58; returns version observed
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
 
     uint8_t tmp[120], *p = tmp;
@@ -267,16 +294,17 @@ STATIC mp_obj_t s_hdnode_deserialize(mp_obj_t self_in, mp_obj_t encoded) {
         memcpy(self->privkey, p, 32);
         p += 32;
         self->have_private = true;
-        self->have_public = false;      // but could calc it
+        _calc_pubkey(self);
     } else if(p[0] == 0x02 || p[0] == 0x3) {
         // 33 bytes of pubkey
         self->have_private = false;
-        self->have_public = true;
         memcpy(self->pubkey, p, 33);
         p += 33;
     } else {
         mp_raise_ValueError(MP_ERROR_TEXT("bad pubkey"));
     }
+
+    _calc_hash160(self);
 
     assert(p == &tmp[78]);
 
@@ -299,12 +327,55 @@ STATIC mp_obj_t s_hdnode_from_master(mp_obj_t self_in, mp_obj_t master_secret_in
     self->depth = 0;
     self->child_num = 0;
     self->have_private = true; 
-    self->have_public = false;
     self->parent_fp = 0;
+
+    _calc_pubkey(self);
+    _calc_hash160(self);
 
     return self_in;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_hdnode_from_master_obj, s_hdnode_from_master);
+
+STATIC mp_obj_t s_hdnode_from_chaincode_privkey(mp_obj_t self_in, mp_obj_t chain_code_in, mp_obj_t privkey_in) {
+    mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+
+    mp_buffer_info_t cc, pk;
+    mp_get_buffer_raise(chain_code_in, &cc, MP_BUFFER_READ);
+    mp_get_buffer_raise(privkey_in, &pk, MP_BUFFER_READ);
+
+    if(cc.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("chaincode len"));
+    }
+    if(pk.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("privkey len"));
+    }
+
+    memcpy(self->privkey, pk.buf, 32);
+    memcpy(self->chain_code, cc.buf, 32);
+    self->depth = 0;
+    self->child_num = 0;
+    self->have_private = true; 
+    self->parent_fp = 0;
+
+    _calc_pubkey(self);
+    _calc_hash160(self);
+
+    return self_in;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_hdnode_from_chaincode_privkey_obj, s_hdnode_from_chaincode_privkey);
+
+
+STATIC mp_obj_t s_hdnode_censor(mp_obj_t self_in) {
+    mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
+
+    self->depth = 0;
+    self->child_num = 0;
+    self->parent_fp = 0;
+
+    return self_in;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_censor_obj, s_hdnode_censor);
 
 
 STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
@@ -319,12 +390,7 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
     sec_setup_ctx();
 
     if(hard && !self->have_private) {
-        mp_raise_TypeError(MP_ERROR_TEXT("hard deriv on pub"));
-    }
-
-    // need public key in all cases
-    if(!self->have_public) {
-        _calc_pubkey(self);
+        mp_raise_TypeError(MP_ERROR_TEXT("hard deriv on pubkey"));
     }
 
     // food for HMAC-SHA512
@@ -346,11 +412,7 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
         ok = secp256k1_ec_privkey_tweak_add(lib_ctx, self->privkey, I.lr.left);
         if(!ok) goto fail;
 
-        if(!hard) {
-            _calc_pubkey(self);
-        } else {
-            self->have_public = false;
-        }
+        _calc_pubkey(self);
     } else {
         secp256k1_pubkey        pub;
 
@@ -365,14 +427,14 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in) {
                                                     &pub, SECP256K1_EC_COMPRESSED);
         if(!ok) goto fail;
         assert(outlen == 33);
-
-        self->have_public = true;
     }
 
     memcpy(self->chain_code, I.lr.right, 32);
     self->depth += 1;
     self->child_num = next_child;
     self->parent_fp = parent_fp;
+
+    _calc_hash160(self);
 
     return self_in;
 
@@ -419,6 +481,18 @@ STATIC mp_obj_t s_hdnode_child_number(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_child_number_obj, s_hdnode_child_number);
 
+STATIC mp_obj_t s_hdnode_chain_code(mp_obj_t self_in) {
+    mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+    raise_on_invalid(self);
+
+    vstr_t vstr;
+    vstr_init_len(&vstr, 32);
+    memcpy(vstr.buf, self->chain_code, 32);
+
+    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_chain_code_obj, s_hdnode_chain_code);
+
 
 // member vars
 STATIC const mp_rom_map_elem_t s_hdnode_locals_dict_table[] = {
@@ -427,14 +501,21 @@ STATIC const mp_rom_map_elem_t s_hdnode_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_serialize), MP_ROM_PTR(&s_hdnode_serialize_obj) },
     { MP_ROM_QSTR(MP_QSTR_deserialize), MP_ROM_PTR(&s_hdnode_deserialize_obj) },
     { MP_ROM_QSTR(MP_QSTR_from_master), MP_ROM_PTR(&s_hdnode_from_master_obj) },
+    { MP_ROM_QSTR(MP_QSTR_from_chaincode_privkey), MP_ROM_PTR(&s_hdnode_from_chaincode_privkey_obj) },
     { MP_ROM_QSTR(MP_QSTR_derive), MP_ROM_PTR(&s_hdnode_derive_obj) },
+    { MP_ROM_QSTR(MP_QSTR_addr_help), MP_ROM_PTR(&s_hdnode_addr_help_obj) },
 
     { MP_ROM_QSTR(MP_QSTR_depth), MP_ROM_PTR(&s_hdnode_depth_obj) },
     { MP_ROM_QSTR(MP_QSTR_child_number), MP_ROM_PTR(&s_hdnode_child_number_obj) },
     { MP_ROM_QSTR(MP_QSTR_parent_fp), MP_ROM_PTR(&s_hdnode_parent_fp_obj) },
     { MP_ROM_QSTR(MP_QSTR_my_fp), MP_ROM_PTR(&s_hdnode_my_fp_obj) },
+    { MP_ROM_QSTR(MP_QSTR_chain_code), MP_ROM_PTR(&s_hdnode_chain_code_obj) },
 
     { MP_ROM_QSTR(MP_QSTR_copy), MP_ROM_PTR(&s_hdnode_copy_obj) },
+    { MP_ROM_QSTR(MP_QSTR_censor), MP_ROM_PTR(&s_hdnode_censor_obj) },
+
+    { MP_ROM_QSTR(MP_QSTR_blank), MP_ROM_PTR(&s_hdnode_blank_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&s_hdnode_blank_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(s_hdnode_locals_dict, s_hdnode_locals_dict_table);
 

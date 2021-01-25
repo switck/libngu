@@ -16,16 +16,22 @@ try:
             priv = w.bip32_key_get_priv_key(node)
             fp = bytearray(4)
             w.bip32_key_get_fingerprint(node, fp)
+
+            cc = w.bip32_key_get_chain_code(node)
             xprv = w.base58check_from_bytes(w.bip32_key_serialize(node, 0))
             xpub = w.base58check_from_bytes(w.bip32_key_serialize(node, w.BIP32_FLAG_KEY_PUBLIC))
+            addr = w.bip32_key_to_address(node, w.WALLY_ADDRESS_TYPE_P2PKH, 0)
             print("  a = HDNode(); a.from_master(%r)" % ms, file=fd)
             print("  assert a.pubkey() == %r" % pub, file=fd)
             print("  assert a.privkey() == %r" % priv, file=fd)
             print("  assert a.my_fp() == 0x%s" % fp.hex(), file=fd)
+            print("  assert a.chain_code() == %r" % bytes(cc), file=fd)
             print("  assert a.serialize(0x488ade4, 1) == %r" % xprv, file=fd)
             print("  assert a.serialize(0x488b21e, 0) == %r" % xpub, file=fd)
+            print("  assert a.addr_help(0) == %r" % addr, file=fd)
             print("  ", file=fd)
 
+        print("gc.collect()", file=fd)
         print("print('PASS')", file=fd)
         print("run code now in: %s" % fd.name)
 
@@ -39,7 +45,7 @@ V_XPUB = 0x0488b21e
 HARD   = 0x80000000
 
 
-import ngu
+import ngu, gc
 #from ngu.hdnode import HDNode
 HDNode = ngu.hdnode.HDNode
 
@@ -84,6 +90,16 @@ def test_derive():
     c = b.copy()
     assert c != b
     assert c.pubkey() == b.pubkey()
+
+def test_misc():
+    a = HDNode()
+    a.from_master(b'1'*32)
+    a.derive(234234)
+
+    b = HDNode().from_chaincode_privkey(a.chain_code(), a.privkey())
+    a.censor()
+    assert a.serialize(0x123, 0) == b.serialize(0x123, 0)
+    assert a.serialize(0x123, 1) == b.serialize(0x123, 1)
 
 def test_vectors():
     from binascii import a2b_hex, b2a_hex
@@ -156,9 +172,21 @@ def test_vectors():
     assert m.serialize(V_XPUB, 0) == 'xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y'
     assert m.serialize(V_XPRV, 1) == 'xprv9uPDJpEQgRQfDcW7BkF7eTya6RPxXeJCqCJGHuCJ4GiRVLzkTXBAJMu2qaMWPrS7AANYqdq6vcBcBUdJCVVFceUvJFjaPdGZ2y9WACViL4L'
 
+def test_addrs():
+    m = HDNode()
+    m.from_master(b'1'*32)
+    m.derive(34).derive(34)
+
+    assert m.addr_help(0)[0] == '1'
+    assert len(m.addr_help()) == 20
+
 test_serial()
 test_b39()
 test_vectors()
 test_derive()
+test_addrs()
+test_misc()
+
+gc.collect()
 
 print('PASS')

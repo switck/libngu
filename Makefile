@@ -34,12 +34,13 @@ test:
 	(cd code; make test)
 
 S_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precision=2\
-				--enable-module-recovery --enable-module-extrakeys --enable-experimental
+				--enable-module-recovery --enable-module-extrakeys --enable-experimental \
+				--enable-module-ecdh
 
-#$(LIB_SECP256K1): Makefile		# XXX broken
 $(LIB_SECP256K1): 
+#$(LIB_SECP256K1): Makefile		# XXX broken
 	(cd $(S_TOP); ./autogen.sh && ./configure $(S_CONF_FLAGS) && make)
 
-.PHONY: one-time
 one-time: $(LIB_SECP256K1)
+.PHONY: one-time
 	

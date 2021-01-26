@@ -4,3 +4,6 @@
 [submodule "libs/micropython"]
 	path = libs/micropython
 	url = git-switck:switck/micropython.git
+[submodule "libs/esp-idf"]
+	path = libs/esp-idf
+	url = https://github.com/espressif/esp-idf.git

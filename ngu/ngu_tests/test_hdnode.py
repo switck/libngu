@@ -64,7 +64,7 @@ def test_serial():
 
 def test_b39():
     import bip39
-    from . import b39_vectors
+    from ngu_tests import b39_vectors
 
     for raw, words, ms, xprv in b39_vectors.english:
         ms = a2b_hex(ms)

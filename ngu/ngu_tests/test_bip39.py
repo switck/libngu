@@ -25,11 +25,11 @@ except ImportError:
     pass
 
 import bip39
-from . import b39_data
-from . import b39_vectors
+from ngu_tests import b39_data
+from ngu_tests import b39_vectors
 
 def test_vectors():
-    for raw, words, ms, _ in b39_vectors.english:
+    for raw, words, ms, _ in b39_vectors.english[0:10]:
         assert bip39.a2b_words(words) == a2b_hex(raw)
         got = bip39.master_secret(words.encode('utf'), a2b_hex('5452455a4f52'))
         assert got == a2b_hex(ms)

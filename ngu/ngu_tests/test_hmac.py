@@ -1,20 +1,20 @@
 
 try:
     import ngu
-    from uhashlib import sha256, sha1
     from ubinascii import hexlify as b2a_hex
     sha512 = ngu.hash.sha512
-    from hmac import HMAC
+    hmac_sha1 = ngu.hmac.hmac_sha1
+    hmac_sha256 = ngu.hmac.hmac_sha256
+    hmac_sha512 = ngu.hmac.hmac_sha512
 except ImportError:
     # desktop
     from binascii import b2a_hex
     from hashlib import sha256, sha1, sha512
-    from hmac import HMAC as _HMAC
-    HMAC = lambda a,b,c,d: _HMAC(a,b,c)
+    from hmac import HMAC
 
-hmac_sha1 = lambda key, msg=None: HMAC(key, msg, sha1, (20, 64)).digest()
-hmac_sha256 = lambda key, msg=None: HMAC(key, msg, sha256, (32, 64)).digest()
-hmac_sha512 = lambda key, msg=None: HMAC(key, msg, sha512, (64, 128)).digest()
+    hmac_sha1 = lambda key, msg=None: HMAC(key, msg, sha1).digest()
+    hmac_sha256 = lambda key, msg=None: HMAC(key, msg, sha256).digest()
+    hmac_sha512 = lambda key, msg=None: HMAC(key, msg, sha512).digest()
 
 assert b2a_hex(hmac_sha1(b'ab'*16, b'hello')) == b'6ffb8c2e3e85677f02913c480a44486018db0552'
 assert b2a_hex(hmac_sha256(b'ab'*16, b'hello')) == b'254ac1adfb14b1de23b5bfc5d1a7d2a0ca0ebcdc2676fed0b81b121912ce6a67'

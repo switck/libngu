@@ -1,6 +1,5 @@
 # desktop-only: ngu_tests/test_codecs.py
 freeze_as_mpy('', [
-    'hmac.py',
     'bip39.py',
 ], opt=3)
 freeze_as_mpy('', [

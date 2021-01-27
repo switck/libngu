@@ -20,6 +20,7 @@ extern const mp_obj_module_t mp_module_secp256k1;
 extern const mp_obj_module_t mp_module_random;
 extern const mp_obj_module_t mp_module_codecs;
 extern const mp_obj_module_t mp_module_hdnode;
+extern const mp_obj_module_t mp_module_hmac;
 
 STATIC const mp_rom_map_elem_t mp_module_ngu_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_ngu) },
@@ -34,6 +35,7 @@ STATIC const mp_rom_map_elem_t mp_module_ngu_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_secp256k1), MP_ROM_PTR(&mp_module_secp256k1) },
     { MP_ROM_QSTR(MP_QSTR_random), MP_ROM_PTR(&mp_module_random) },
     { MP_ROM_QSTR(MP_QSTR_codecs), MP_ROM_PTR(&mp_module_codecs) },
+    { MP_ROM_QSTR(MP_QSTR_hmac), MP_ROM_PTR(&mp_module_hmac) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ngu_globals, mp_module_ngu_globals_table);

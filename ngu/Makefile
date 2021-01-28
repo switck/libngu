@@ -1,9 +1,12 @@
 # see also micropython.mk
 
 all:
-	(cd ..; make)
+	(cd ..; make -f makefile.unix)
+
 tags:
 	(cd ..; make tags)
 
-esp32:
-	(cd ..; make -f Makefile.esp32)
+esp:
+	(cd ..; make -f makefile.esp32)
+stm:
+	(cd ..; make -f makefile.stm32)

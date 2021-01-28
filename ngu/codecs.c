@@ -9,14 +9,8 @@
 #include <stdio.h>
 #include "my_assert.h"
 
-#if MICROPY_SSL_MBEDTLS
-# include "mbedtls/sha256.h"
-#else
-# error "need sha256"
-#endif
-
 #include "base32.h"
-
+#include "hash.h"
 #include "libbase58.h"
 
 // 
@@ -59,11 +53,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b32encode_obj, c_b32encode);
 // for libbase58 to call
 bool b58_sha256_impl(void *out, const void *inp, int len)
 {
-    mbedtls_sha256_context ctx;
-    mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, inp, len);
-    mbedtls_sha256_finish_ret(&ctx, out);
+    sha256_single(inp, len, out);
 
     return true;
 }

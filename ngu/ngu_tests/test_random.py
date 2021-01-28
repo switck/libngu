@@ -3,7 +3,7 @@ import ngu
 
 for trial in range(100):
     v = [ngu.random.uint32() for i in range(1000)]
-    assert len(v) == len(set(v))
+    assert len(v) == len(set(v))        # re-run if fails
     assert max(v) > 0x80000000
     assert min(v) < 0x80000000
 

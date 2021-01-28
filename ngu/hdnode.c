@@ -10,9 +10,7 @@
 
 #include "sec_shared.h"
 #include "libbase58.h"
-#include "mbedtls/md.h"
-#include "mbedtls/ripemd160.h"
-#include "mbedtls/sha256.h"
+#include "hash.h"
 
 #define EXTRA_DEBUG
 
@@ -33,25 +31,6 @@ typedef struct  {
 } mp_obj_hdnode_t;
 
 STATIC const mp_obj_type_t s_hdnode_type;
-
-typedef union {
-    struct {
-        uint8_t     left[32];
-        uint8_t     right[32];
-    } lr;
-    uint8_t     both[64];
-} left_right_t;
-
-void hmac_sha512(const uint8_t *key, uint32_t key_len,
-                    const uint8_t *data, uint32_t data_len,
-                    left_right_t *result)
-{
-    STATIC_ASSERT(sizeof(left_right_t) == 64);
-    const mbedtls_md_info_t *md_algo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
-
-    int rv = mbedtls_md_hmac(md_algo, key, key_len, data, data_len, result->both);
-    assert(rv == 0);
-}
 
 static inline uint8_t *write_be32(uint8_t *p, uint32_t v)
 {
@@ -80,7 +59,7 @@ static inline void raise_on_invalid(mp_obj_hdnode_t *n)
     }
 }
 
-void _calc_pubkey(mp_obj_hdnode_t *self)
+static void _calc_pubkey(mp_obj_hdnode_t *self)
 {
     // calc based on privkey
     assert(self->have_private);
@@ -101,26 +80,12 @@ void _calc_pubkey(mp_obj_hdnode_t *self)
 }
 
 
-void _calc_hash160(mp_obj_hdnode_t *self)
+static inline void _calc_hash160(mp_obj_hdnode_t *self)
 {
-    uint8_t tmp[32];
-
-    mbedtls_sha256_context ctx;
-    mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, self->pubkey, 33);
-    mbedtls_sha256_finish_ret(&ctx, tmp);
-    mbedtls_sha256_free(&ctx);
-    
-    mbedtls_ripemd160_context    r_ctx;
-    mbedtls_ripemd160_init(&r_ctx);
-    mbedtls_ripemd160_starts_ret(&r_ctx);
-    mbedtls_ripemd160_update_ret(&r_ctx, tmp, 32);
-    mbedtls_ripemd160_finish_ret(&r_ctx, self->hash160);
-    mbedtls_ripemd160_free(&r_ctx);
+    hash160(self->pubkey, 33, self->hash160);
 }
 
-uint32_t _calc_my_fp(mp_obj_hdnode_t *self)
+static uint32_t _calc_my_fp(mp_obj_hdnode_t *self)
 {
     uint8_t *p = self->hash160;
     return read_be32(&p);
@@ -316,7 +281,7 @@ STATIC mp_obj_t s_hdnode_deserialize(mp_obj_t self_in, mp_obj_t encoded) {
     self->path[0] = 0;
     self->root_fp = 0;
     if(self->depth) {
-        sprintf(self->path, "m/_/%d", self->child_num & 0x7fffffff);
+        snprintf(self->path, sizeof(self->path), "m/_/%d", (int)(self->child_num & 0x7fffffff));
         if( self->child_num & 0x80000000) {
             strcat(self->path, "'");
         }
@@ -473,7 +438,8 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in, mp_obj
     if(strlen(self->path) >= sizeof(self->path)-12) {
         strcpy(self->path, "/_");
     }
-    sprintf(self->path+strlen(self->path), "/%d", next_child & 0x7fffffff);
+    snprintf(self->path+strlen(self->path), sizeof(self->path)-strlen(self->path),
+                        "/%d", (int)(next_child & 0x7fffffff));
     if(hard) {
         strcat(self->path, "'");
     }

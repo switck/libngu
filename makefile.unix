@@ -1,0 +1,13 @@
+
+# mac bugfix
+export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
+
+# see ./var
+MPY_MAKE_ARGS = -j 4 VARIANT=ngu VARIANT_DIR=$(realpath var) V=$(V) \
+					USER_C_MODULES=$(realpath .) NGU_TOP_DIR=$(realpath .)
+TARGET = var/micropython
+REQUIRES = Makefile makefile.unix ngu/*.[ch] var/*
+MPY_PORT_DIR = $(MPY_TOP)/ports/unix
+
+
+include Makefile

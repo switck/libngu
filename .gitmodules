@@ -7,3 +7,6 @@
 [submodule "libs/esp-idf"]
 	path = libs/esp-idf
 	url = https://github.com/espressif/esp-idf.git
+[submodule "libs/cifra"]
+	path = libs/cifra
+	url = https://github.com/ctz/cifra.git

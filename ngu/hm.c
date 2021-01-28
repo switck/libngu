@@ -11,13 +11,10 @@
 #include "my_assert.h"
 
 #if MICROPY_SSL_MBEDTLS
-#include "mbedtls/md.h"
-#else
-# error "requires MBEDTLS"
+# include "mbedtls/md.h"
 #endif
 
-STATIC mp_obj_t hmac_X(const mbedtls_md_info_t *algo, int md_size,
-                            mp_obj_t key_in, mp_obj_t msg_in)
+STATIC mp_obj_t hmac_X(int md_size, mp_obj_t key_in, mp_obj_t msg_in)
 {
     mp_buffer_info_t key, msg;
     mp_get_buffer_raise(key_in, &key, MP_BUFFER_READ);
@@ -26,30 +23,51 @@ STATIC mp_obj_t hmac_X(const mbedtls_md_info_t *algo, int md_size,
     vstr_t rv_out;
     vstr_init_len(&rv_out, md_size);
 
+#if MICROPY_SSL_MBEDTLS
+    const mbedtls_md_info_t *algo;
+
+    switch(md_size) {
+        case 64:
+            algo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
+            break;
+        case 32:
+            algo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+            break;
+        case 20:
+            algo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
+            break;
+        default:
+            mp_raise_ValueError(NULL);
+    }
+
     int x = mbedtls_md_hmac(algo, key.buf, key.len, msg.buf, msg.len, (uint8_t*)rv_out.buf);
 
     if(x) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("mbedtls_md_hmac"));
     }
 
+#else
+// XXX add code here
+#endif
+
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv_out);
 }
 
 STATIC mp_obj_t hmac_sha512(mp_obj_t key_in, mp_obj_t msg_in)
 {
-    return hmac_X(mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 64, key_in, msg_in);
+    return hmac_X(64, key_in, msg_in);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(hmac_sha512_obj, hmac_sha512);
 
 STATIC mp_obj_t hmac_sha256(mp_obj_t key_in, mp_obj_t msg_in)
 {
-    return hmac_X(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 32, key_in, msg_in);
+    return hmac_X(32, key_in, msg_in);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(hmac_sha256_obj, hmac_sha256);
 
 STATIC mp_obj_t hmac_sha1(mp_obj_t key_in, mp_obj_t msg_in)
 {
-    return hmac_X(mbedtls_md_info_from_type(MBEDTLS_MD_SHA1), 20, key_in, msg_in);
+    return hmac_X(20, key_in, msg_in);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(hmac_sha1_obj, hmac_sha1);
 

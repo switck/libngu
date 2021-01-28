@@ -3,18 +3,20 @@
 //
 // - sign, verify sig
 // - 256 bit curves only
+// - for bitcoin projects, just use k1.c instead
 //
 #include "py/runtime.h"
+#if MICROPY_SSL_MBEDTLS
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "my_assert.h"
 
-#if MICROPY_SSL_MBEDTLS
 #include "mbedtls/ecp.h"
 #include "mbedtls/ecdsa.h"
-#else
-# error "requires MBEDTLS"
+
+#ifndef MBEDTLS_ECP_C
+# error "requires MBEDTLS_ECP_C"
 #endif
 
 typedef struct _mp_obj_curve_t {
@@ -197,3 +199,4 @@ const mp_obj_module_t mp_module_ec = {
     .globals = (mp_obj_dict_t *)&mp_module_ec_globals,
 };
 
+#endif

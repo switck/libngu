@@ -5,17 +5,14 @@
 // - verify chain?
 //
 #include "py/runtime.h"
+#if MICROPY_SSL_MBEDTLS
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "my_assert.h"
 
-#if MICROPY_SSL_MBEDTLS
 #include "mbedtls/x509.h"
 #include "mbedtls/x509_crt.h"
-#else
-# error "requires MBEDTLS"
-#endif
 
 // wrap lib calls with this to raise useful errors
 #define CHECK_RESULT(funct)      { int rv = (funct); \
@@ -163,3 +160,4 @@ const mp_obj_module_t mp_module_cert = {
     .globals = (mp_obj_dict_t *)&mod_globals,
 };
 
+#endif

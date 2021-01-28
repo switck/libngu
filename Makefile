@@ -2,23 +2,16 @@
 MPY_TOP ?= libs/micropython
 S_TOP ?= libs/secp256k1
 
-# mac bugfix
-export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
+all: $(TARGET)
 
-SUB_MAKE_ARGS = -j 4 VARIANT=ngu VARIANT_DIR=$(realpath var) V=$(V) \
-					USER_C_MODULES=$(realpath .) NGU_TOP_DIR=$(realpath .)
+$(TARGET): $(REQUIRES)
 
-all: ngu-micropython
-
-ngu-micropython: var/micropython
-
-# build a version of micropython (unix port) that includes exactly what we need
-var/micropython: Makefile ngu/*.[ch] var/*
-	cd $(MPY_TOP)/ports/unix && $(MAKE) $(SUB_MAKE_ARGS)
+# build a version of micropython (some port+board) that includes exactly what we need
+$(TARGET): 
+	cd $(MPY_PORT_DIR) && $(MAKE) $(MPY_MAKE_ARGS)
 
 clean:
-	cd $(MPY_TOP)/ports/unix && $(MAKE) $(SUB_MAKE_ARGS) clean
-
+	cd $(MPY_PORT_DIR) && $(MAKE) $(MPY_MAKE_ARGS) clean
 
 tags:
 	ctags -f .tags ngu/*.[hc] \
@@ -43,5 +36,11 @@ one-time:
 esp:
 	make -f Makefile.esp32 && make -f Makefile.esp32 esp-deploy
 
-quick:
-	make && ./ngu-micropython -c 'import ngu_tests.run'
+quick: all
+	make -f Makefile.unix
+	./ngu-micropython -c 'import ngu_tests.run'
+
+clobber:
+	make -f makefile.unix clean
+	make -f makefile.esp32 clean
+	make -f makefile.stm32 clean

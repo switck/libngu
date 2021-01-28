@@ -19,9 +19,20 @@
 # define CHIP_TRNG_32()         esp_random()
 #endif
 
+#ifdef MICROPY_PY_STM
+// ports/stm32/rng.c
+extern uint32_t rng_get(void);
+# define CHIP_TRNG_SETUP()      
+# define CHIP_TRNG_32()         rng_get()
+
+# ifndef MICROPY_HW_ENABLE_RNG
+# error "get a HW TRNG plz"
+# endif
+#endif
+
 #ifdef UNIX
 # define CHIP_TRNG_SETUP()      
-# define CHIP_TRNG_32()       arc4random()
+# define CHIP_TRNG_32()         arc4random()
 #endif
 
 #ifndef CHIP_TRNG_SETUP

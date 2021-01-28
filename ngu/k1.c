@@ -14,7 +14,12 @@
 #include "my_assert.h"
 
 #include "sec_shared.h"
+
+#if MICROPY_SSL_MBEDTLS
 #include "mbedtls/sha256.h"
+#else
+#include "extmod/crypto-algorithms/sha256.h"
+#endif
 
 typedef struct  {
     mp_obj_base_t base;
@@ -39,7 +44,7 @@ STATIC const mp_obj_type_t s_keypair_type;
 // Shared context for all ops. Never freed.
 secp256k1_context   *lib_ctx;
 
-static void s_illegal_cb(const char* message, void* data)
+void secp256k1_default_illegal_callback_fn(const char* message, void* data)
 {
 #ifndef MICROPY_ROM_TEXT_COMPRESSION
     mp_raise_ValueError(message);
@@ -47,7 +52,8 @@ static void s_illegal_cb(const char* message, void* data)
     mp_raise_ValueError(MP_ERROR_TEXT("secp256k1 illegal"));
 #endif
 }
-static void s_error_cb(const char* message, void* data)
+
+void secp256k1_default_error_callback_fn(const char* message, void* data)
 {
 #ifndef MICROPY_ROM_TEXT_COMPRESSION
     mp_raise_ValueError(message);
@@ -68,8 +74,10 @@ void sec_setup_ctx(void)
         mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("secp256k1_context_create"));
     }
 
+/*
     secp256k1_context_set_illegal_callback(lib_ctx, s_illegal_cb, NULL);
     secp256k1_context_set_error_callback(lib_ctx, s_error_cb, NULL);
+*/
 }
 
 // Constructor for signature
@@ -304,6 +312,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_pubkey_obj, s_keypair_pubkey);
 static int _my_ecdh_hash(unsigned char *output, const unsigned char *x32, const unsigned char *y32, void *data) {
     (void)data;
 
+#if MICROPY_SSL_MBEDTLS
+
     mbedtls_sha256_context ctx;
 
     mbedtls_sha256_init(&ctx);
@@ -312,6 +322,15 @@ static int _my_ecdh_hash(unsigned char *output, const unsigned char *x32, const 
     mbedtls_sha256_update_ret(&ctx, y32, 32);
     mbedtls_sha256_finish_ret(&ctx, output);
     mbedtls_sha256_free(&ctx);
+
+#else
+    // see extmod/crypto-algorithms/sha256.h
+    CRYAL_SHA256_CTX    ctx;
+    sha256_init(&ctx);
+    sha256_update(&ctx, x32, 32);
+    sha256_update(&ctx, y32, 32);
+    sha256_final(&ctx, output);
+#endif
 
     return 1;
 }

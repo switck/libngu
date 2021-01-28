@@ -31,7 +31,7 @@ except ImportError:
             print(f'assert {vector!r} == {code}decode({enc!r}), "fail @ {ln}"', file=fd)
             print(f'assert {vector!r} == {code}decode({code}encode({vector!r})), "fail @ {ln}"', file=fd)
 
-    print("print('PASS')", file=fd)
+    print("print('PASS - %s')" % fd.name, file=fd)
 
     print("run code now in: %s" % fd.name)
 

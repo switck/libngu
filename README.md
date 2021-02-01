@@ -6,7 +6,7 @@ Name is "Number Go Up" ... because need that.
 
 **Absoletely none of SHITCOINS allowed here**
 
-## Primative
+## Primatives
 
 - using [libsecp256k1](https://github.com/bitcoin-core/secp256k1) for everything, except:
 - [mbedtls](https://github.com/ARMmbed/mbedtls) if already present on target (ESP32 uses for TLS)
@@ -21,6 +21,28 @@ Name is "Number Go Up" ... because need that.
     export PKG_CONFIG_PATH=/usr/local/opt/libffi/lib/pkgconfig
     setenv PKG_CONFIG_PATH /usr/local/opt/libffi/lib/pkgconfig
 
-- secp256k1 (see Makefile) has to be configured w/ stuff we need
+## Install
+
+- `make one-time` does submodule bullshit, configures K1 lib
+- `make quick` compiles Unix micropython port, runs tests
+- can play with `./ngu-micropython` binary on your desktop
+- compile for ESP32 and burn onto TTGO board
+```
+make -f makefile.esp32
+make -f makefile.esp32 deploy
+```
+- on target, do:
+```
+>>> import ngu_tests.run
+```
+or for single test:
+```
+>>> import ngu_tests.test_hash
+```
+
+- STM32 port builds, but untested:
+```
+make -f makefile.stm32 
+```
 
 

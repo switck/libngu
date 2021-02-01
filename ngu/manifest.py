@@ -3,7 +3,7 @@ freeze_as_mpy('', [
 ], opt=3)
 
 import os
-if os.environ.get('EXCLUDE_TESTS', False):
+if not os.environ.get('EXCLUDE_TESTS', False):
     print("NGU: including tests")
     freeze_as_mpy('', [
         "ngu_tests/run.py",
@@ -22,4 +22,4 @@ if os.environ.get('EXCLUDE_TESTS', False):
         "ngu_tests/test_k1.py",
         "ngu_tests/test_k1_gen.py",
         "ngu_tests/test_random.py",
-    ], opt=0)       # need zero-optimization so asserts are executed
+    ], opt=0)       # need zero-optimization so asserts are included

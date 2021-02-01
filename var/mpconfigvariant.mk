@@ -1,4 +1,4 @@
-# see libs/micropython/ports/unix/Makefile
+# see libs/mpy/ports/unix/Makefile
 
 COPT += 
 

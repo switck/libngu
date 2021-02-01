@@ -1,6 +1,7 @@
 # Location of key submods
-MPY_TOP ?= libs/micropython
+MPY_TOP ?= libs/mpy
 S_TOP ?= libs/secp256k1
+MBED_TOP ?= $(MPY_TOP)/lib/mbedtls
 
 all: $(TARGET)
 
@@ -18,8 +19,7 @@ tags:
 	$(filter-out $(MPY_TOP)/py/dynruntime.h, $(wildcard $(MPY_TOP)/py/*.[hc])) \
 	libs/secp256k1/{src,include}/*.[hc] \
 	libs/secp256k1/src/modules/*/*.[hc] \
-	libs/micropython/lib/mbedtls/include/mbedtls/*.h \
-	libs/micropython/lib/mbedtls/crypto/library/*.c
+	$(MBED_TOP)/include/mbedtls/*.h $(MBED_TOP)/library/*.c
 
 test tests:
 	(cd ngu/ngu_tests; make tests)
@@ -30,6 +30,8 @@ K1_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precis
 
 .PHONY: one-time
 one-time:
+	cd $(MPY_TOP); git submodule update
+	cd $(MPY_TOP)/mpy-cross; make
 	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS)
 	
 

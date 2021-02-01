@@ -7,3 +7,6 @@
 [submodule "libs/cifra"]
 	path = libs/cifra
 	url = https://github.com/ctz/cifra.git
+[submodule "libs/mpy"]
+	path = libs/mpy
+	url = https://github.com/micropython/micropython.git

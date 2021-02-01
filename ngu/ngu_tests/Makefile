@@ -17,7 +17,6 @@ test tests:
 	$(MPY) test_k1.py
 	$(MPY) test_k1_gen.py
 	$(PY) test_hmac.py
-	#$(MPY) test_hmac.py  redo
 	$(MPY) test_cert.py
 	$(PY) test_ec.py
 	$(MPY) test_ec.py

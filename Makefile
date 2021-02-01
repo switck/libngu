@@ -34,13 +34,19 @@ one-time:
 	
 
 esp:
-	make -f Makefile.esp32 && make -f Makefile.esp32 esp-deploy
+	make -f Makefile.esp32 && make -f Makefile.esp32 deploy
+	echo "Run: import ngu_tests.run"
 
-quick: all
+quick:
 	make -f Makefile.unix
+	(cd ngu/ngu_tests; make)
 	./ngu-micropython -c 'import ngu_tests.run'
+
+relink:
+	$(RM) $(TARGET)
 
 clobber:
 	make -f makefile.unix clean
 	make -f makefile.esp32 clean
 	make -f makefile.stm32 clean
+

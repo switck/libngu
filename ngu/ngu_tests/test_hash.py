@@ -26,8 +26,12 @@ except ImportError:
         print("import ngu", file=fd)
 
         for nm, func in cases:
-            for msg in [ b'', b'123', b'3'*63]:
-                print("assert ngu.hash.%s(%r) == %r" % (nm, msg, func(msg)), file=fd)
+            for mlen in range(0, 64, 3):
+                msg = (b'123abc'*40)[0:mlen]
+                print("assert ngu.hash.%s(%r) == %r   #len%d" % (nm, msg, func(msg), mlen), file=fd)
+            if nm != 'ripemd160':
+                n = 2000
+                print("assert ngu.hash.%s(bytes(%d)) == %r" % (nm, n, func(bytes(n))), file=fd)
 
         print("F = ngu.hash.pbkdf2_sha512", file=fd)
         for pw, salt, rounds in [ 

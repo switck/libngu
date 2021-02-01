@@ -48,6 +48,17 @@ STATIC mp_obj_t hmac_X(int md_size, mp_obj_t key_in, mp_obj_t msg_in)
 
 #else
 // XXX add code here
+// - secp256k1_hmac_sha256_initialize
+    mp_raise_ValueError(NULL);
+#if 0
+    if(md_size == 32) {
+        secp256k1_sha256    ctx;
+
+        secp256k1_sha256_initialize(secp256k1_sha256 *hash);
+        secp256k1_sha256_write(secp256k1_sha256 *hash, const unsigned char *data, size_t size);
+        secp256k1_sha256_finalize(secp256k1_sha256 *hash, unsigned char *out32);
+    }
+#endif
 #endif
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv_out);

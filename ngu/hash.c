@@ -29,6 +29,7 @@ typedef struct _mp_obj_hash_t {
     char state[0];
 } mp_obj_hash_t;
 
+void ripemd160(const uint8_t *msg, int msglen, uint8_t digest[20]);
 
 //
 // SHA512
@@ -149,17 +150,15 @@ STATIC mp_obj_t hm_single_ripemd160(mp_obj_t arg) {
     vstr_t vstr;
     vstr_init_len(&vstr, 20);
 
-#if MICROPY_SSL_MBEDTLS
+#if 0
     mbedtls_ripemd160_context ctx;
     mbedtls_ripemd160_init(&ctx);
     mbedtls_ripemd160_starts_ret(&ctx);
     mbedtls_ripemd160_update_ret(&ctx, inp.buf, inp.len);
     mbedtls_ripemd160_finish_ret(&ctx, (uint8_t *)vstr.buf);
     mbedtls_ripemd160_free(&ctx);
-#else
-    ripemd160(inp.buf, inp.len, (uint8_t *)vstr.buf);
 #endif
-
+    ripemd160(inp.buf, inp.len, (uint8_t *)vstr.buf);
     
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
@@ -274,16 +273,24 @@ const mp_obj_module_t mp_module_hash = {
 
 void ripemd160(const uint8_t *msg, int msglen, uint8_t digest[20])
 {
-    if(msglen >= 63) {
-        mp_raise_ValueError(MP_ERROR_TEXT("limited to 64 bytes"));
+    if(msglen > 63) {
+        mp_raise_ValueError(MP_ERROR_TEXT("limited to 63 bytes"));
     }
 
+#if defined(MP_ENDIANNESS_LITTLE)
+    // look ma: zero copy
+    uint32_t    *ctx = (uint32_t *)digest;
+
+    MDinit(ctx);
+    MDfinish(ctx, msg, msglen, 0);
+#else
     uint32_t    ctx[5];
 
     MDinit(ctx);
     MDfinish(ctx, msg, msglen, 0);
-
     memcpy(digest, ctx, 20);        // endian?
+#error "untested"
+#endif
 }
 
 void hash160(const uint8_t *msg, int msglen, uint8_t digest[20])
@@ -299,12 +306,16 @@ void hash160(const uint8_t *msg, int msglen, uint8_t digest[20])
     mbedtls_sha256_finish_ret(&ctx, tmp);
     mbedtls_sha256_free(&ctx);
     
+#if 0
     mbedtls_ripemd160_context    r_ctx;
     mbedtls_ripemd160_init(&r_ctx);
     mbedtls_ripemd160_starts_ret(&r_ctx);
     mbedtls_ripemd160_update_ret(&r_ctx, tmp, 32);
     mbedtls_ripemd160_finish_ret(&r_ctx, digest);
     mbedtls_ripemd160_free(&r_ctx);
+#endif
+    ripemd160(tmp, 32, digest);
+
 #else
     cf_hash(&cf_sha256, msg, msglen, tmp);
     ripemd160(tmp, 32, digest);

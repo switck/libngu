@@ -2,7 +2,7 @@
 	path = libs/secp256k1
 	url = https://github.com/bitcoin-core/secp256k1.git
 [submodule "libs/micropython"]
-	path = libs/micropython
+	path = libs/s-mpy
 	url = git-switck:switck/micropython.git
 [submodule "libs/esp-idf"]
 	path = libs/esp-idf

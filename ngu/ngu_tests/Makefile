@@ -3,6 +3,8 @@ PY = python3
 
 test tests:
 	test x$(VIRTUAL_ENV) != x		# need virtualenv
+	$(PY) test_aes.py
+	$(MPY) test_aes_gen.py
 	$(PY) test_hdnode.py
 	$(MPY) test_hdnode.py
 	$(MPY) test_hdnode_gen.py

@@ -12,6 +12,7 @@ Name is "Number Go Up" ... because need that.
 - [mbedtls](https://github.com/ARMmbed/mbedtls) if already present on target (ESP32 uses for TLS)
 - otherwise use [cifra](https://github.com/ctz/cifra)
 - generic EC, certificates stuff, disabled if no mbedtls
+- AES submodule disabled if you have mbedtls, because ucryptolib is same
 - libwally-core used for testing only
 
 ## Notes

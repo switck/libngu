@@ -2,7 +2,7 @@
 
 MY_FILES = hash.c modngu.c ec.c cert.c k1.c random.c base32.c codecs.c hm.c \
 			libbase58.c hdnode.c my_assert.c lib_secp256k1.c \
-			rmd160.c
+			rmd160.c aes.c
 
 CFLAGS_USERMOD += -I$(NGU_TOP_DIR)/ngu -I$(NGU_TOP_DIR)/libs
 # -DCONFIG_MBEDTLS_RIPEMD160_C=1
@@ -15,12 +15,14 @@ FROZEN_MANIFEST += $(NGU_TOP_DIR)/ngu/manifest.py
 
 ifdef NGU_NEEDS_CIFRA
 MY_FILES += lib_cifra.c
+CFLAGS_USERMOD += -DNGU_INCL_AES=1
 
 %/lib_cifra.o: \
 	CFLAGS_USERMOD += -I$(NGU_TOP_DIR)/libs/cifra/src -I$(NGU_TOP_DIR)/libs/cifra/src/ext
 
 CIFRA_SRC = $(NGU_TOP_DIR)/libs/cifra/src
-CIFRA_PARTS = hmac.o sha1.o sha3.o sha256.o sha512.o pbkdf2.o chash.o blockwise.o
+CIFRA_PARTS = hmac.o sha1.o sha3.o sha256.o sha512.o pbkdf2.o chash.o blockwise.o \
+				aes.o modes.o
 CIFRA_OBJS = $(addprefix $(CIFRA_SRC)/, $(CIFRA_PARTS))
 
 #%/lib_cifra.o: $(CIFRA_OBJS)

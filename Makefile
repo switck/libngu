@@ -19,6 +19,7 @@ tags:
 	$(filter-out $(MPY_TOP)/py/dynruntime.h, $(wildcard $(MPY_TOP)/py/*.[hc])) \
 	libs/secp256k1/{src,include}/*.[hc] \
 	libs/secp256k1/src/modules/*/*.[hc] \
+	libs/cifra/src/*.[hc] \
 	$(MBED_TOP)/include/mbedtls/*.h $(MBED_TOP)/library/*.c
 
 test tests:
@@ -32,8 +33,11 @@ K1_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precis
 one-time:
 	cd $(MPY_TOP); git submodule update
 	cd $(MPY_TOP)/mpy-cross; make
-	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS)
+	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make src/ecmult_static_context.h
 	
+.PHONY: k1-config
+k1-config:
+	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make src/ecmult_static_context.h
 
 esp:
 	make -f Makefile.esp32 && make -f Makefile.esp32 deploy

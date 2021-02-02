@@ -4,6 +4,7 @@ pycoin
 mnemonic
 ecdsa>=0.13
 wallycore==0.8.1
+pyaes==1.6.1
 
 # esp32 port
 pyserial

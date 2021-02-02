@@ -1,9 +1,9 @@
 
 #if 1
 # undef assert
-# define assert(e)      ((void) ((e) ? ((void)0) : my_assert(__FILE__, __LINE__)))
+# define assert(e)      ((void) ((e) ? ((void)0) : _ngu_assert(__FILE__, __LINE__)))
 
-extern void my_assert(const char *fname, int line_num) __attribute__((noreturn));
+extern void _ngu_assert(const char *fname, int line_num) __attribute__((noreturn));
 
 #else
 # include <assert.h>

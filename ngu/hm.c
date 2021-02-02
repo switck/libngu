@@ -12,6 +12,11 @@
 
 #if MICROPY_SSL_MBEDTLS
 # include "mbedtls/md.h"
+#else
+# include "cifra/hmac.h"
+# include "cifra/sha1.h"
+# include "cifra/sha2.h"
+# include "cifra/sha3.h"
 #endif
 
 STATIC mp_obj_t hmac_X(int md_size, mp_obj_t key_in, mp_obj_t msg_in)
@@ -47,18 +52,22 @@ STATIC mp_obj_t hmac_X(int md_size, mp_obj_t key_in, mp_obj_t msg_in)
     }
 
 #else
-// XXX add code here
-// - secp256k1_hmac_sha256_initialize
-    mp_raise_ValueError(NULL);
-#if 0
-    if(md_size == 32) {
-        secp256k1_sha256    ctx;
-
-        secp256k1_sha256_initialize(secp256k1_sha256 *hash);
-        secp256k1_sha256_write(secp256k1_sha256 *hash, const unsigned char *data, size_t size);
-        secp256k1_sha256_finalize(secp256k1_sha256 *hash, unsigned char *out32);
+    // cifra
+    const cf_chash *algo = NULL;
+    switch(md_size) {
+        case 64:
+            algo = &cf_sha3_512;
+            break;
+        case 32:
+            algo = &cf_sha256;
+            break;
+        case 20:
+            algo = &cf_sha1;
+            break;
+        default:
+            mp_raise_ValueError(NULL);
     }
-#endif
+    cf_hmac(key.buf, key.len, msg.buf, msg.len, (uint8_t*)rv_out.buf, algo);
 #endif
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv_out);

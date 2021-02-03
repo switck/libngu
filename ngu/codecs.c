@@ -157,9 +157,6 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
 
     { MP_ROM_QSTR(MP_QSTR_segwit_encode), MP_ROM_PTR(&c_segwit_encode_obj) },
     { MP_ROM_QSTR(MP_QSTR_segwit_decode), MP_ROM_PTR(&c_segwit_decode_obj) },
-
-    { MP_ROM_QSTR(MP_QSTR_ENCODING_BECH32), MP_ROM_INT(BECH32_ENCODING_BECH32) },
-    { MP_ROM_QSTR(MP_QSTR_ENCODING_BECH32m), MP_ROM_INT(BECH32_ENCODING_BECH32M) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

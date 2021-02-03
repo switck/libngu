@@ -5,13 +5,14 @@ try:
     import pycoin.encoding.b58
     b58encode = pycoin.encoding.b58.b2a_hashed_base58
     b58decode = pycoin.encoding.b58.a2b_hashed_base58
+    ngu = None
 except ImportError:
     import ngu
-    b32encode = ngu.codecs.b32encode
-    b32decode = ngu.codecs.b32decode
+    b32encode = ngu.codecs.b32_encode
+    b32decode = ngu.codecs.b32_decode
 
-    b58encode = ngu.codecs.b58encode
-    b58decode = ngu.codecs.b58decode
+    b58encode = ngu.codecs.b58_encode
+    b58decode = ngu.codecs.b58_decode
 
 # len=1
 assert b'l' == b32decode(b'NQ======'), "fail @ 1"
@@ -91,4 +92,31 @@ assert b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xd
 # len=85
 assert b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12' == b58decode('4sS4hhDhzBTrQGDDZy6JhPuozauitcS761BvMnmmFt6GagpHmzGUsY5FqxfcoLYsN3GsX2eNG4NhwDoNEojavU4GBHdvrBqoNoHr9uwD17ebL4EJ9KqeY8spWW'), "fail @ 85"
 assert b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12' == b58decode(b58encode(b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12')), "fail @ 85"
+
+if ngu:
+ msg = b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xdd'
+ assert ngu.codecs.segwit_decode('bc1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzprcnzfh') == ('bc', 0, msg[0:20])
+ assert ngu.codecs.segwit_encode('bc', 0, msg[0:20]) == 'bc1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzprcnzfh'
+ assert ngu.codecs.segwit_decode('bc1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmws0yk0md') == ('bc', 0, msg[0:32])
+ assert ngu.codecs.segwit_encode('bc', 0, msg[0:32]) == 'bc1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmws0yk0md'
+ assert ngu.codecs.segwit_decode('bc1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpa659p7') == ('bc', 1, msg[0:20])
+ assert ngu.codecs.segwit_encode('bc', 1, msg[0:20]) == 'bc1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpa659p7'
+ assert ngu.codecs.segwit_decode('bc1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmws9nkxr3') == ('bc', 1, msg[0:32])
+ assert ngu.codecs.segwit_encode('bc', 1, msg[0:32]) == 'bc1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmws9nkxr3'
+ assert ngu.codecs.segwit_decode('bc10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpy2pu48') == ('bc', 15, msg[0:20])
+ assert ngu.codecs.segwit_encode('bc', 15, msg[0:20]) == 'bc10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpy2pu48'
+ assert ngu.codecs.segwit_decode('bc10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsm2qepp') == ('bc', 15, msg[0:32])
+ assert ngu.codecs.segwit_encode('bc', 15, msg[0:32]) == 'bc10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsm2qepp'
+ assert ngu.codecs.segwit_decode('tb1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpf7g3jy') == ('tb', 0, msg[0:20])
+ assert ngu.codecs.segwit_encode('tb', 0, msg[0:20]) == 'tb1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpf7g3jy'
+ assert ngu.codecs.segwit_decode('tb1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwscvqqpz') == ('tb', 0, msg[0:32])
+ assert ngu.codecs.segwit_encode('tb', 0, msg[0:32]) == 'tb1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwscvqqpz'
+ assert ngu.codecs.segwit_decode('tb1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzphu0k6d') == ('tb', 1, msg[0:20])
+ assert ngu.codecs.segwit_encode('tb', 1, msg[0:20]) == 'tb1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzphu0k6d'
+ assert ngu.codecs.segwit_decode('tb1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsjmqfe7') == ('tb', 1, msg[0:32])
+ assert ngu.codecs.segwit_encode('tb', 1, msg[0:32]) == 'tb1pdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsjmqfe7'
+ assert ngu.codecs.segwit_decode('tb10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpwv60w5') == ('tb', 15, msg[0:20])
+ assert ngu.codecs.segwit_encode('tb', 15, msg[0:20]) == 'tb10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpwv60w5'
+ assert ngu.codecs.segwit_decode('tb10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsvzkkmw') == ('tb', 15, msg[0:32])
+ assert ngu.codecs.segwit_encode('tb', 15, msg[0:32]) == 'tb10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsvzkkmw'
 print('PASS - test_codecs_gen.py')

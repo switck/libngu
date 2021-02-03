@@ -56,7 +56,7 @@ def test_serial():
     a.deserialize('xprv9s21ZrQH143K3FperxDp8vFsFycKCRcJGAFmcV7umQmcnMZaLtZRt13QJDsoS5F6oYT6BB4sS6zmTmyQAEkJKxJ7yByDNtRe5asP2jFGhT6')
     s = a.serialize(0x0488B21E, 0)
     assert s[0:4] == 'xpub'
-    assert len(ngu.codecs.b58decode(s)) == 78
+    assert len(ngu.codecs.b58_decode(s)) == 78
 
     b = HDNode()
     vo = b.deserialize(s)

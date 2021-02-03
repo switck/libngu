@@ -10,3 +10,6 @@
 [submodule "libs/mpy"]
 	path = libs/mpy
 	url = https://github.com/micropython/micropython.git
+[submodule "libs/bech32"]
+	path = libs/bech32
+	url = https://github.com/sipa/bech32.git

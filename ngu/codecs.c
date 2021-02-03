@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "my_assert.h"
+#include "bech32/segwit_addr.h"
 
 #include "base32.h"
 #include "hash.h"
@@ -88,17 +89,77 @@ STATIC mp_obj_t c_b58encode(mp_obj_t arg_in)
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b58encode_obj, c_b58encode);
 
+// Segwit = BECH32(m)
+
+STATIC mp_obj_t c_segwit_encode(mp_obj_t hrp_in, mp_obj_t witver_in, mp_obj_t prog_in)
+{
+    const char *hrp = mp_obj_str_get_str(hrp_in);
+    int witver = mp_obj_get_int_truncated(witver_in);
+
+    mp_buffer_info_t prog;
+    mp_get_buffer_raise(prog_in, &prog, MP_BUFFER_READ);
+
+
+    char tmp[127];
+
+    int ok = segwit_addr_encode(tmp, hrp, witver, prog.buf, prog.len);
+
+    if(!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("segwit_addr_encode"));
+    }
+
+    return mp_obj_new_str(tmp, strlen(tmp));
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(c_segwit_encode_obj, c_segwit_encode);
+
+
+STATIC mp_obj_t c_segwit_decode(mp_obj_t addr_in)
+{
+    const char *addr = mp_obj_str_get_str(addr_in);
+
+    char hrp_actual[20];
+    uint8_t data[84];
+    size_t data_len = sizeof(data);
+    int version = -1;
+    bech32_encoding enc;
+
+    int ok = segwit_addr_decode_detailed(&version, data, &data_len, hrp_actual, &enc, addr);
+    if(!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("bech32 encoding"));
+    }
+    if (version == 0 && enc != BECH32_ENCODING_BECH32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("needs bech32, wasnt"));
+    }
+    if (version > 0 && enc != BECH32_ENCODING_BECH32M) {
+        mp_raise_ValueError(MP_ERROR_TEXT("needs bech32m, wasnt"));
+    }
+
+    mp_obj_t    rv[3] = {
+        mp_obj_new_str(hrp_actual, strlen(hrp_actual)),
+        MP_OBJ_NEW_SMALL_INT(version),
+        mp_obj_new_bytes(data, data_len),
+    };
+
+    return mp_obj_new_tuple(3, rv);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_segwit_decode_obj, c_segwit_decode);
+
 
 
 STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_codecs) },
 
-    { MP_ROM_QSTR(MP_QSTR_b32encode), MP_ROM_PTR(&c_b32encode_obj) },
-    { MP_ROM_QSTR(MP_QSTR_b32decode), MP_ROM_PTR(&c_b32decode_obj) },
+    { MP_ROM_QSTR(MP_QSTR_b32_encode), MP_ROM_PTR(&c_b32encode_obj) },
+    { MP_ROM_QSTR(MP_QSTR_b32_decode), MP_ROM_PTR(&c_b32decode_obj) },
 
-    { MP_ROM_QSTR(MP_QSTR_b58encode), MP_ROM_PTR(&c_b58encode_obj) },
-    { MP_ROM_QSTR(MP_QSTR_b58decode), MP_ROM_PTR(&c_b58decode_obj) },
+    { MP_ROM_QSTR(MP_QSTR_b58_encode), MP_ROM_PTR(&c_b58encode_obj) },
+    { MP_ROM_QSTR(MP_QSTR_b58_decode), MP_ROM_PTR(&c_b58decode_obj) },
 
+    { MP_ROM_QSTR(MP_QSTR_segwit_encode), MP_ROM_PTR(&c_segwit_encode_obj) },
+    { MP_ROM_QSTR(MP_QSTR_segwit_decode), MP_ROM_PTR(&c_segwit_decode_obj) },
+
+    { MP_ROM_QSTR(MP_QSTR_ENCODING_BECH32), MP_ROM_INT(BECH32_ENCODING_BECH32) },
+    { MP_ROM_QSTR(MP_QSTR_ENCODING_BECH32m), MP_ROM_INT(BECH32_ENCODING_BECH32M) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

@@ -19,7 +19,7 @@ tags:
 	$(filter-out $(MPY_TOP)/py/dynruntime.h, $(wildcard $(MPY_TOP)/py/*.[hc])) \
 	libs/secp256k1/{src,include}/*.[hc] \
 	libs/secp256k1/src/modules/*/*.[hc] \
-	libs/cifra/src/*.[hc] \
+	libs/cifra/src/*.[hc] ngu/bech32/*.[hc] \
 	$(MBED_TOP)/include/mbedtls/*.h $(MBED_TOP)/library/*.c
 
 test tests:

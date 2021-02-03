@@ -2,7 +2,7 @@
 
 MY_FILES = hash.c modngu.c ec.c cert.c k1.c random.c base32.c codecs.c hm.c \
 			libbase58.c hdnode.c my_assert.c lib_secp256k1.c \
-			rmd160.c aes.c
+			rmd160.c aes.c lib_segwit.c
 
 CFLAGS_USERMOD += -I$(NGU_TOP_DIR)/ngu -I$(NGU_TOP_DIR)/libs
 # -DCONFIG_MBEDTLS_RIPEMD160_C=1
@@ -36,3 +36,5 @@ CIFRA_OBJS = $(addprefix $(CIFRA_SRC)/, $(CIFRA_PARTS))
 endif
 
 SRC_USERMOD += $(addprefix $(NGU_TOP_DIR)/ngu/, $(MY_FILES))
+
+%/lib_segwit.o: CFLAGS += -Wno-return-type

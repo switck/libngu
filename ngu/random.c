@@ -95,6 +95,48 @@ STATIC mp_obj_t random_uint32(void) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(random_uint32_obj, random_uint32);
 
+int _bit_length(uint32_t x)
+{
+    if(!x) return 0;
+
+    int bits = 1;
+    while(x >> bits) {
+        bits += 1;
+    }
+    return bits;
+}
+
+int _rand_below(int mx)
+{
+    if(mx <= 1) return 0;
+
+    int bl = _bit_length(mx);
+    assert(bl && (bl < 31));
+
+    CHIP_TRNG_SETUP();
+
+    uint32_t mask = (2 << bl)-1;
+    uint32_t pt = my_yasmarang();
+    pt ^= CHIP_TRNG_32();
+
+    while(1) {
+        int rv = (int)(pt & mask);
+        if(rv < mx) {
+            return rv;
+        }
+
+        pt ^= my_yasmarang();
+    }
+}
+
+STATIC mp_obj_t random_uniform(mp_obj_t mx_in) {
+    int mx = mp_obj_get_int_truncated(mx_in);
+
+    return mp_obj_new_int_from_uint(_rand_below(mx));
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_uniform_obj, random_uniform);
+
+
 STATIC mp_obj_t random_bytes(mp_obj_t count_in)
 {
     int count = mp_obj_get_int_truncated(count_in);
@@ -117,8 +159,7 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
 
     { MP_ROM_QSTR(MP_QSTR_bytes), MP_ROM_PTR(&random_bytes_obj) },
     { MP_ROM_QSTR(MP_QSTR_uint32), MP_ROM_PTR(&random_uint32_obj) },
-    //{ MP_ROM_QSTR(MP_QSTR_shuffle), MP_ROM_PTR(&random_suffle) },
-
+    { MP_ROM_QSTR(MP_QSTR_uniform), MP_ROM_PTR(&random_uniform_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

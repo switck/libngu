@@ -401,7 +401,7 @@ STATIC MP_DEFINE_CONST_DICT(s_keypair_locals_dict, s_keypair_locals_dict_table);
 
 STATIC const mp_obj_type_t s_keypair_type = {
     { &mp_type_type },
-    .name = MP_QSTR_secp256k1_privkey,
+    .name = MP_QSTR_secp256k1_keypair,
     .make_new = s_keypair_make_new,
     .locals_dict = (void *)&s_keypair_locals_dict,
 };

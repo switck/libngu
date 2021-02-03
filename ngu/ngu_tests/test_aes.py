@@ -21,13 +21,13 @@ AES = ngu.aes
         print(f'assert AES.CBC(False, {key!r}, {iv!r}).cipher({expect!r}) == {msg!r}', file=fd)
 
         expect = pyaes.AESModeOfOperationCTR(key, pyaes.Counter(0)).encrypt(msg)
-        print(f'assert AES.CTR({key!r}, bytes(16)).cipher({msg!r}) == {expect!r}', file=fd)
+        print(f'assert AES.CTR({key!r}).cipher({msg!r}) == {expect!r}', file=fd)
         print(f'assert AES.CTR({key!r}, bytes(16)).cipher({expect!r}) == {msg!r}', file=fd)
 
         mlen = 1023
         expect = pyaes.AESModeOfOperationCTR(key, pyaes.Counter(0)).encrypt(bytes(mlen))
         print(f'assert AES.CTR({key!r}, bytes(16)).cipher(bytes({mlen}))[-8:] == {expect[-8:]!r}', file=fd)
-        print(f'assert AES.CTR({key!r}, bytes(16)).cipher({expect!r}) == bytes({mlen})', file=fd)
+        print(f'assert AES.CTR({key!r}).cipher({expect!r}) == bytes({mlen})', file=fd)
 
     print("print('PASS - %s')" % fd.name, file=fd)
 

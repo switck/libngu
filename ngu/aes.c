@@ -69,20 +69,25 @@ STATIC mp_obj_t s_CBC_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
 }
 STATIC mp_obj_t s_CTR_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     // args: key, nonce
-    mp_arg_check_num(n_args, n_kw, 2, 2, false);
+    mp_arg_check_num(n_args, n_kw, 1, 2, false);
 
     mp_obj_CTR_t *o = m_new_obj_with_finaliser(mp_obj_CTR_t);
     o->base.type = type;
 
     _aes_setup(&o->aes_ctx, args[0]);
 
-    mp_buffer_info_t nonce;
-    mp_get_buffer_raise(args[1], &nonce, MP_BUFFER_READ);
-    if(nonce.len != CF_MAXBLOCK) {
-        mp_raise_ValueError(NULL);
-    }
+    if(n_args == 2) {
+        mp_buffer_info_t nonce;
+        mp_get_buffer_raise(args[1], &nonce, MP_BUFFER_READ);
+        if(nonce.len != CF_MAXBLOCK) {
+            mp_raise_ValueError(NULL);
+        }
+        cf_ctr_init(&o->mode_ctx, &cf_aes, &o->aes_ctx, nonce.buf);
+    } else {
+        uint8_t nonce[CF_MAXBLOCK] = {0};
 
-    cf_ctr_init(&o->mode_ctx, &cf_aes, &o->aes_ctx, nonce.buf);
+        cf_ctr_init(&o->mode_ctx, &cf_aes, &o->aes_ctx, nonce);
+    }
     
     return o;
 }

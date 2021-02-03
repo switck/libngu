@@ -12,6 +12,11 @@
 #include "hash.h"
 #include "rmd160.h"
 
+#if 0
+// useful for testing Cifra on Unix port
+#undef MICROPY_SSL_MBEDTLS
+#endif
+
 #if MICROPY_SSL_MBEDTLS
 # include "mbedtls/ripemd160.h"
 # include "mbedtls/sha512.h"
@@ -46,9 +51,9 @@ STATIC mp_obj_t modngu_hash_sha512_make_new(const mp_obj_type_t *type, size_t n_
     mbedtls_sha512_init((mbedtls_sha512_context *)o->state);
     mbedtls_sha512_starts_ret((mbedtls_sha512_context *)o->state, false);
 #else
-    mp_obj_hash_t *o = m_new_obj_var(mp_obj_hash_t, char, sizeof(cf_sha3_context));
+    mp_obj_hash_t *o = m_new_obj_var(mp_obj_hash_t, char, sizeof(cf_sha512_context));
     o->base.type = type;
-    cf_sha3_512_init((cf_sha3_context *)o->state);
+    cf_sha512_init((cf_sha512_context *)o->state);
 #endif
 
     if(n_args == 1) {
@@ -66,7 +71,7 @@ STATIC mp_obj_t modngu_hash_sha512_update(mp_obj_t self_in, mp_obj_t arg) {
 #if MICROPY_SSL_MBEDTLS
     mbedtls_sha512_update_ret((mbedtls_sha512_context *)self->state, bufinfo.buf, bufinfo.len);
 #else
-    cf_sha3_512_update((cf_sha3_context *)self->state, bufinfo.buf, bufinfo.len);
+    cf_sha512_update((cf_sha512_context *)self->state, bufinfo.buf, bufinfo.len);
 #endif
 
     return mp_const_none;
@@ -82,7 +87,7 @@ STATIC mp_obj_t modngu_hash_sha512_digest(mp_obj_t self_in) {
     mbedtls_sha512_finish_ret((mbedtls_sha512_context *)self->state, (byte *)vstr.buf);
     mbedtls_sha512_free((mbedtls_sha512_context *)self->state);
 #else
-    cf_sha3_512_digest_final((cf_sha3_context *)self->state, (byte *)vstr.buf);
+    cf_sha512_digest_final((cf_sha512_context *)self->state, (byte *)vstr.buf);
 #endif
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
@@ -218,7 +223,7 @@ STATIC mp_obj_t pbkdf2_sha512(mp_obj_t pass_in, mp_obj_t salt_in, mp_obj_t round
 #if MICROPY_SSL_MBEDTLS
         mbedtls_md_hmac(md_algo, pass.buf, pass.len, asalt, sizeof(asalt), d1);
 #else
-        cf_hmac(pass.buf, pass.len, asalt, sizeof(asalt), d1, &cf_sha3_512);
+        cf_hmac(pass.buf, pass.len, asalt, sizeof(asalt), d1, &cf_sha512);
 #endif
 
 		//hmac_sha256(asalt, salt_len + 4, pass.buf, pass.len, d1);
@@ -229,7 +234,7 @@ STATIC mp_obj_t pbkdf2_sha512(mp_obj_t pass_in, mp_obj_t salt_in, mp_obj_t round
 #if MICROPY_SSL_MBEDTLS
             mbedtls_md_hmac(md_algo, pass.buf, pass.len, d1, sizeof(d1), d2);
 #else
-            cf_hmac(pass.buf, pass.len, d1, sizeof(d1), d2, &cf_sha3_512);
+            cf_hmac(pass.buf, pass.len, d1, sizeof(d1), d2, &cf_sha512);
 #endif
 			memcpy(d1, d2, sizeof(d1));
 			for (uint32_t j = 0; j < sizeof(obuf); j++)

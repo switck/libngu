@@ -10,6 +10,11 @@
 #include <stdio.h>
 #include "my_assert.h"
 
+#if 0
+// useful for testing Cifra on Unix port
+#undef MICROPY_SSL_MBEDTLS
+#endif
+
 #if MICROPY_SSL_MBEDTLS
 # include "mbedtls/md.h"
 #else
@@ -56,7 +61,7 @@ STATIC mp_obj_t hmac_X(int md_size, mp_obj_t key_in, mp_obj_t msg_in)
     const cf_chash *algo = NULL;
     switch(md_size) {
         case 64:
-            algo = &cf_sha3_512;
+            algo = &cf_sha512;
             break;
         case 32:
             algo = &cf_sha256;

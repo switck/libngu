@@ -43,7 +43,7 @@ STATIC mp_obj_t c_b32encode(mp_obj_t arg_in) {
         mp_raise_ValueError(NULL);
     }
 
-    return mp_obj_new_bytes(tmp, len_out);
+    return mp_obj_new_str((char *)tmp, len_out);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b32encode_obj, c_b32encode);
 
@@ -85,7 +85,7 @@ STATIC mp_obj_t c_b58encode(mp_obj_t arg_in)
         mp_raise_ValueError(NULL);
     }
 
-    return mp_obj_new_bytes((uint8_t *)tmp, len_out);
+    return mp_obj_new_str(tmp, len_out-1);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b58encode_obj, c_b58encode);
 

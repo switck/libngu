@@ -119,12 +119,10 @@ STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size
     mp_obj_pubkey_t *o = m_new_obj(mp_obj_pubkey_t);
     o->base.type = type;
 
-    sec_setup_ctx();
-
     mp_buffer_info_t inp;
     mp_get_buffer_raise(args[0], &inp, MP_BUFFER_READ);
     
-    int rv = secp256k1_ec_pubkey_parse(lib_ctx, &o->pubkey, inp.buf, inp.len);
+    int rv = secp256k1_ec_pubkey_parse(secp256k1_context_no_precomp, &o->pubkey, inp.buf, inp.len);
 
     if(rv != 1) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_parse"));
@@ -137,8 +135,6 @@ STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size
 STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     mp_obj_pubkey_t *self = MP_OBJ_TO_PTR(args[0]);
 
-    sec_setup_ctx();
-
     vstr_t vstr;
     vstr_init_len(&vstr, 66);
 
@@ -149,7 +145,7 @@ STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     }
 
     size_t outlen = vstr.len;
-    secp256k1_ec_pubkey_serialize(lib_ctx, (uint8_t *)vstr.buf, &outlen,
+    secp256k1_ec_pubkey_serialize(secp256k1_context_no_precomp, (uint8_t *)vstr.buf, &outlen,
             &self->pubkey,
             compressed ? SECP256K1_EC_COMPRESSED: SECP256K1_EC_UNCOMPRESSED );
 
@@ -162,13 +158,11 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_pubkey_to_bytes_obj, 1, 2, s_pubkey
 STATIC mp_obj_t s_sig_to_bytes(mp_obj_t self_in) {
     mp_obj_sig_t *self = MP_OBJ_TO_PTR(self_in);
 
-    sec_setup_ctx();
-
     int recid = 0;
     vstr_t vstr;
     vstr_init_len(&vstr, 65);
 
-    secp256k1_ecdsa_recoverable_signature_serialize_compact(lib_ctx,
+    secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_context_no_precomp,
                 ((uint8_t *)vstr.buf)+1, &recid, &self->sig);
 
     // first byte is bitcoin-specific rec id

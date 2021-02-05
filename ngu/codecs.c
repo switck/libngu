@@ -103,7 +103,6 @@ STATIC mp_obj_t c_segwit_encode(mp_obj_t hrp_in, mp_obj_t witver_in, mp_obj_t pr
     char tmp[127];
 
     int ok = segwit_addr_encode(tmp, hrp, witver, prog.buf, prog.len);
-
     if(!ok) {
         mp_raise_ValueError(MP_ERROR_TEXT("segwit_addr_encode"));
     }
@@ -121,17 +120,10 @@ STATIC mp_obj_t c_segwit_decode(mp_obj_t addr_in)
     uint8_t data[84];
     size_t data_len = sizeof(data);
     int version = -1;
-    bech32_encoding enc;
 
-    int ok = segwit_addr_decode_detailed(&version, data, &data_len, hrp_actual, &enc, addr);
+    int ok = segwit_addr_decode_detailed(&version, data, &data_len, hrp_actual, addr);
     if(!ok) {
         mp_raise_ValueError(MP_ERROR_TEXT("bech32 encoding"));
-    }
-    if (version == 0 && enc != BECH32_ENCODING_BECH32) {
-        mp_raise_ValueError(MP_ERROR_TEXT("needs bech32, wasnt"));
-    }
-    if (version > 0 && enc != BECH32_ENCODING_BECH32M) {
-        mp_raise_ValueError(MP_ERROR_TEXT("needs bech32m, wasnt"));
     }
 
     mp_obj_t    rv[3] = {

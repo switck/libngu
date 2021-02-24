@@ -4,6 +4,7 @@
 #include "secp256k1/include/secp256k1_recovery.h"
 #include "secp256k1/include/secp256k1_extrakeys.h"
 #include "secp256k1/include/secp256k1_ecdh.h"
+#include "secp256k1/include/secp256k1_preallocated.h"
 
 
 // Shared context for all files in ngu. Never freed.

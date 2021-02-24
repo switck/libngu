@@ -41,7 +41,7 @@ STATIC const mp_obj_type_t s_pubkey_type;
 STATIC const mp_obj_type_t s_sig_type;
 STATIC const mp_obj_type_t s_keypair_type;
 
-// Shared context for all ops. Never freed.
+// Shared context for all major ops.
 secp256k1_context   *lib_ctx;
 
 void secp256k1_default_illegal_callback_fn(const char* message, void* data)
@@ -62,22 +62,33 @@ void secp256k1_default_error_callback_fn(const char* message, void* data)
 #endif
 }
 
-// make big heavy shared object for all calls
 void sec_setup_ctx(void)
 {
     if(lib_ctx) return;
 
-    lib_ctx = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY 
-                                            | SECP256K1_CONTEXT_SIGN
-                                            | SECP256K1_CONTEXT_DECLASSIFY);
+    // make big heavy shared object for all calls
+    const uint32_t flags = SECP256K1_CONTEXT_VERIFY
+                            | SECP256K1_CONTEXT_SIGN
+                            | SECP256K1_CONTEXT_DECLASSIFY;
+
+    size_t need = secp256k1_context_preallocated_size(flags);
+    //printf("need = 0x%x\n\n", (int)need);            // = 0x20e0 on unix, 0x20c0 on esp32
+
+    // need to protect this from GC, so make a fake module to hold it
+    uint8_t *ws = m_malloc(need);
+    mp_obj_t *xx = mp_obj_new_bytearray_by_ref(need, ws);
+    mp_obj_t mod_obj = mp_obj_new_module(MP_QSTR__ngu_workspace);
+    mp_obj_dict_t *globals = mp_obj_module_get_globals(mod_obj);
+
+    mp_obj_dict_store(globals, MP_ROM_QSTR(MP_QSTR__ngu_workspace), xx);
+
+    lib_ctx = secp256k1_context_preallocated_create(ws, flags);
+
     if(!lib_ctx) {
-        mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("secp256k1_context_create"));
+        mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("secp256k1_context_preallocated_create"));
     }
 
-/*
-    secp256k1_context_set_illegal_callback(lib_ctx, s_illegal_cb, NULL);
-    secp256k1_context_set_error_callback(lib_ctx, s_error_cb, NULL);
-*/
+    // static error callbacks already in place above, no need to setup
 }
 
 // Constructor for signature
@@ -408,7 +419,6 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_keypair), MP_ROM_PTR(&s_keypair_type) },
     { MP_ROM_QSTR(MP_QSTR_signature), MP_ROM_PTR(&s_sig_type) },
     { MP_ROM_QSTR(MP_QSTR_sign), MP_ROM_PTR(&s_sign_obj) },
-
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

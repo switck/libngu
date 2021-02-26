@@ -3,7 +3,7 @@ freeze_as_mpy('', [
 ], opt=3)
 
 import os
-if not os.environ.get('EXCLUDE_TESTS', False):
+if not os.environ.get('EXCLUDE_NGU_TESTS', False):
     print("NGU: including tests")
     freeze_as_mpy('', [
         "ngu_tests/run.py",

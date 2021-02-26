@@ -13,18 +13,17 @@
 #include "cifra/modes.h"
 #include "cifra/aes.h"
 
-
 typedef struct  {
-    mp_obj_base_t base;
-    bool        is_encrypt;
-    cf_aes_context      aes_ctx;
-    cf_cbc      mode_ctx;
+    mp_obj_base_t   base;
+    bool            is_encrypt;
+    cf_aes_context  aes_ctx;
+    cf_cbc          mode_ctx;
 } mp_obj_CBC_t;
 
 typedef struct  {
-    mp_obj_base_t base;
-    cf_aes_context      aes_ctx;
-    cf_ctr      mode_ctx;
+    mp_obj_base_t   base;
+    cf_aes_context  aes_ctx;
+    cf_ctr          mode_ctx;
 } mp_obj_CTR_t;
 
 STATIC const mp_obj_type_t s_CBC_type, s_CTR_type;
@@ -145,6 +144,17 @@ STATIC mp_obj_t s_CBC_blank(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_CBC_blank_obj, s_CBC_blank);
 
+STATIC mp_obj_t s_CBC_copy(mp_obj_t self_in) {
+    mp_obj_CBC_t *self = MP_OBJ_TO_PTR(self_in);
+
+    mp_obj_CBC_t *rv = m_new_obj_with_finaliser(mp_obj_CBC_t);
+    *rv = *self;
+    rv->base.type = &s_CBC_type;
+    
+    return rv;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_CBC_copy_obj, s_CBC_copy);
+
 STATIC mp_obj_t s_CTR_blank(mp_obj_t self_in) {
     mp_obj_CTR_t *self = MP_OBJ_TO_PTR(self_in);
 
@@ -156,10 +166,22 @@ STATIC mp_obj_t s_CTR_blank(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_CTR_blank_obj, s_CTR_blank);
 
+STATIC mp_obj_t s_CTR_copy(mp_obj_t self_in) {
+    mp_obj_CTR_t *self = MP_OBJ_TO_PTR(self_in);
+
+    mp_obj_CTR_t *rv = m_new_obj_with_finaliser(mp_obj_CTR_t);
+    *rv = *self;
+    rv->base.type = &s_CTR_type;
+    
+    return rv;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_CTR_copy_obj, s_CTR_copy);
+
 
 STATIC const mp_rom_map_elem_t s_CBC_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_cipher), MP_ROM_PTR(&s_CBC_cipher_obj) },
     { MP_ROM_QSTR(MP_QSTR_blank), MP_ROM_PTR(&s_CBC_blank_obj) },
+    { MP_ROM_QSTR(MP_QSTR_copy), MP_ROM_PTR(&s_CBC_copy_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&s_CBC_blank_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(s_CBC_locals_dict, s_CBC_locals_dict_table);
@@ -174,6 +196,7 @@ STATIC const mp_obj_type_t s_CBC_type = {
 STATIC const mp_rom_map_elem_t s_CTR_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_cipher), MP_ROM_PTR(&s_CTR_cipher_obj) },
     { MP_ROM_QSTR(MP_QSTR_blank), MP_ROM_PTR(&s_CTR_blank_obj) },
+    { MP_ROM_QSTR(MP_QSTR_copy), MP_ROM_PTR(&s_CTR_copy_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&s_CTR_blank_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(s_CTR_locals_dict, s_CTR_locals_dict_table);

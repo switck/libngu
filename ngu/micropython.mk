@@ -1,5 +1,7 @@
 # this file autodetected by py/py.mk based on its name
 
+NGU_TOP_DIR := $(realpath $(USERMOD_DIR)/..)
+
 MY_FILES = hash.c modngu.c ec.c cert.c k1.c random.c base32.c codecs.c hm.c \
 			libbase58.c hdnode.c my_assert.c lib_secp256k1.c \
 			rmd160.c aes.c lib_segwit.c
@@ -35,6 +37,6 @@ CIFRA_OBJS = $(addprefix $(CIFRA_SRC)/, $(CIFRA_PARTS))
 
 endif
 
-SRC_USERMOD += $(addprefix $(NGU_TOP_DIR)/ngu/, $(MY_FILES))
+SRC_USERMOD += $(addprefix $(USERMOD_DIR)/, $(MY_FILES))
 
 %/lib_segwit.o: CFLAGS += -Wno-return-type

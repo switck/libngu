@@ -332,8 +332,9 @@ def _split_lookup(phrase):
 
     rv = 0
     for w in phrase:
-        idx = wordlist_en.index(w)
-        if idx < 0:
+        try:
+            idx = wordlist_en.index(w)
+        except ValueError:
             raise ValueError(w)
 
         rv = (rv << 11) | idx
@@ -411,6 +412,10 @@ def next_char(prefix):
         word = wordlist_en[wn]
         if word[0:pl] > prefix: break
         if word[0:pl] == prefix:
+            if pl >= 4:
+                # they gave 4+ letter prefix of correct word; they're done
+                return (True, '', word)
+
             if not count:
                 first = word
 

@@ -35,8 +35,10 @@ one-time:
 	cd $(MPY_TOP)/mpy-cross; make
 	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make src/ecmult_static_context.h
 	
-.PHONY: k1-config
-k1-config:
+# get ready to build library, but not full Micropython nor Unix test code
+.PHONY: min-one-time
+min-one-time:
+	cd libs; git submodule update --init bech32 cifra secp256k1
 	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make src/ecmult_static_context.h
 
 esp:

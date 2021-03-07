@@ -143,8 +143,8 @@ int b58check(const void *bin, int binsz, const char *base58str)
 	if (binsz < 4)
 		return -4;
 
-    if (!my_dblsha256(buf, bin, binsz - 4))
-        return -2;
+	if (!my_dblsha256(buf, bin, binsz - 4))
+		return -2;
 
 	if (memcmp(&binc[binsz - 4], buf, 4))
 		return -1;

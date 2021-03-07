@@ -282,20 +282,25 @@ void ripemd160(const uint8_t *msg, int msglen, uint8_t digest[20])
         mp_raise_ValueError(MP_ERROR_TEXT("limited to 63 bytes"));
     }
 
-#if defined(MP_ENDIANNESS_LITTLE)
-    // look ma: zero copy
-    uint32_t    *ctx = (uint32_t *)digest;
-
-    MDinit(ctx);
-    MDfinish(ctx, msg, msglen, 0);
-#else
-    uint32_t    ctx[5];
-
-    MDinit(ctx);
-    MDfinish(ctx, msg, msglen, 0);
-    memcpy(digest, ctx, 20);        // endian?
-#error "untested"
+#if !defined(MP_ENDIANNESS_LITTLE)
+#error "untested; suspect endian challenge here"
 #endif
+
+    if(((uint32_t)digest) & 0x3) {
+        // unaligned case
+        uint32_t    ctx[5];
+
+        MDinit(ctx);
+        MDfinish(ctx, msg, msglen, 0);
+
+        memcpy(digest, ctx, 20);
+    } else {
+        // zero copy, works in place
+        uint32_t    *ctx = (uint32_t *)digest;
+
+        MDinit(ctx);
+        MDfinish(ctx, msg, msglen, 0);
+    }
 }
 
 void hash160(const uint8_t *msg, int msglen, uint8_t digest[20])

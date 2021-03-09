@@ -67,14 +67,12 @@ void sec_setup_ctx(void)
     if(lib_ctx) return;
 
     // make big heavy shared object for all calls
-    const uint32_t flags = SECP256K1_CONTEXT_VERIFY
-                            | SECP256K1_CONTEXT_SIGN
-                            | SECP256K1_CONTEXT_DECLASSIFY;
+    const uint32_t flags = SECP256K1_CONTEXT_VERIFY | SECP256K1_CONTEXT_SIGN;
 
     size_t need = secp256k1_context_preallocated_size(flags);
-    //printf("need = 0x%x\n\n", (int)need);            // = 0x20e0 on unix, 0x20c0 on esp32
+    //printf("need = 0x%x\n\n", (int)need);            // = 0x20e0 on unix, 0x20c0 on esp32, stm32
 
-    // need to protect this from GC, so make a fake module to hold it
+    // need to protect this data from GC, so make a fake module to hold it
     uint8_t *ws = m_malloc(need);
     mp_obj_t *xx = mp_obj_new_bytearray_by_ref(need, ws);
     mp_obj_t mod_obj = mp_obj_new_module(MP_QSTR__ngu_workspace);

@@ -207,7 +207,7 @@ STATIC mp_obj_t s_sig_verify_recover(mp_obj_t self_in, mp_obj_t digest_in)
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_sig_verify_recover_obj, s_sig_verify_recover);
 
 
-STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in)
+STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter_in)
 {
     sec_setup_ctx();
 
@@ -236,14 +236,20 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in)
     mp_obj_sig_t *rv = m_new_obj(mp_obj_sig_t);
     rv->base.type = &s_sig_type;
 
-    int x = secp256k1_ecdsa_sign_recoverable(lib_ctx, &rv->sig, digest.buf, pk, secp256k1_nonce_function_default, NULL);
+    // allow grinding of different nonce values
+    int counter = mp_obj_get_int_truncated(counter_in);
+    uint32_t    nonce_data[8] = { counter, 0, };
+    uint8_t     *nonce_ptr = counter ? ((uint8_t *)nonce_data) : NULL;
+
+    int x = secp256k1_ecdsa_sign_recoverable(lib_ctx, &rv->sig, digest.buf, pk,
+                                                secp256k1_nonce_function_default, nonce_ptr);
     if(x != 1) {
         mp_raise_ValueError(MP_ERROR_TEXT("verify/recover sig"));
     }
     
     return MP_OBJ_FROM_PTR(rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_sign_obj, s_sign);
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_obj, s_sign);
 
 // KEY PAIRS (private key, with public key computed)
 

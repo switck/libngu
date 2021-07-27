@@ -25,9 +25,10 @@ tags:
 test tests:
 	(cd ngu/ngu_tests; make tests)
 
-K1_CONF_FLAGS = --with-bignum=no --with-ecmult-window=8 --with-ecmult-gen-precision=2 \
+K1_CONF_FLAGS = --with-bignum=no --with-ecmult-window=2 --with-ecmult-gen-precision=2 \
 				--enable-module-recovery --enable-module-extrakeys --enable-experimental \
-				--enable-module-ecdh
+				--enable-module-ecdh \
+				--enable-ecmult-static-precomputation
 
 .PHONY: one-time
 one-time:

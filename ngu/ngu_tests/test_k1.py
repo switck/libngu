@@ -51,17 +51,17 @@ assert p.to_bytes() == odd != uncomp
 # sigs
 pk = b'x'*32
 md = b'z'*32
-sig = ngu.secp256k1.sign(pk, md)
+sig = ngu.secp256k1.sign(pk, md, 0)
 assert len(sig.to_bytes()) == 65
 pubkey = sig.verify_recover(md)
 assert len(pubkey.to_bytes()) == 33
 
-sig2 = ngu.secp256k1.sign(pk, md)
+sig2 = ngu.secp256k1.sign(pk, md, 0)
 assert sig.to_bytes() == sig2.to_bytes()
 
 pair = ngu.secp256k1.keypair(pk)
 assert pair.privkey() == pk
-sig4 = ngu.secp256k1.sign(pair, md)
+sig4 = ngu.secp256k1.sign(pair, md, 0)
 assert sig.to_bytes() == sig4.to_bytes()
 
 sig3 = ngu.secp256k1.signature(sig2.to_bytes()[:-1] + b'\0')

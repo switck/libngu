@@ -64,12 +64,11 @@ def test_prefix():
 
     wl = bip39.wordlist_en
     for w in wl:
-        ex, nexts, final = bip39.next_char(w[0:4])
+        exact, nexts, final = bip39.next_char(w[0:4])
+        assert exact == True
         if len(w) < 4:
-            assert ex == True
             assert final in {w, None}           # act vs. aim
         else:
-            assert ex == (len(w) == 4)
             assert final == w
     
 

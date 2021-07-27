@@ -67,14 +67,12 @@ void sec_setup_ctx(void)
     if(lib_ctx) return;
 
     // make big heavy shared object for all calls
-    const uint32_t flags = SECP256K1_CONTEXT_VERIFY
-                            | SECP256K1_CONTEXT_SIGN
-                            | SECP256K1_CONTEXT_DECLASSIFY;
+    const uint32_t flags = SECP256K1_CONTEXT_VERIFY | SECP256K1_CONTEXT_SIGN;
 
     size_t need = secp256k1_context_preallocated_size(flags);
-    //printf("need = 0x%x\n\n", (int)need);            // = 0x20e0 on unix, 0x20c0 on esp32
+    //printf("need = 0x%x\n\n", (int)need);            // = 0x20e0 on unix, 0x20c0 on esp32, stm32
 
-    // need to protect this from GC, so make a fake module to hold it
+    // need to protect this data from GC, so make a fake module to hold it
     uint8_t *ws = m_malloc(need);
     mp_obj_t *xx = mp_obj_new_bytearray_by_ref(need, ws);
     mp_obj_t mod_obj = mp_obj_new_module(MP_QSTR__ngu_workspace);
@@ -209,7 +207,7 @@ STATIC mp_obj_t s_sig_verify_recover(mp_obj_t self_in, mp_obj_t digest_in)
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_sig_verify_recover_obj, s_sig_verify_recover);
 
 
-STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in)
+STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter_in)
 {
     sec_setup_ctx();
 
@@ -238,14 +236,20 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in)
     mp_obj_sig_t *rv = m_new_obj(mp_obj_sig_t);
     rv->base.type = &s_sig_type;
 
-    int x = secp256k1_ecdsa_sign_recoverable(lib_ctx, &rv->sig, digest.buf, pk, secp256k1_nonce_function_default, NULL);
+    // allow grinding of different nonce values
+    int counter = mp_obj_get_int_truncated(counter_in);
+    uint32_t    nonce_data[8] = { counter, 0, };
+    uint8_t     *nonce_ptr = counter ? ((uint8_t *)nonce_data) : NULL;
+
+    int x = secp256k1_ecdsa_sign_recoverable(lib_ctx, &rv->sig, digest.buf, pk,
+                                                secp256k1_nonce_function_default, nonce_ptr);
     if(x != 1) {
         mp_raise_ValueError(MP_ERROR_TEXT("verify/recover sig"));
     }
     
     return MP_OBJ_FROM_PTR(rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_sign_obj, s_sign);
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_obj, s_sign);
 
 // KEY PAIRS (private key, with public key computed)
 

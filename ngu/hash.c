@@ -343,17 +343,17 @@ void sha256_single(const uint8_t *msg, int msglen, uint8_t digest[32])
     __HAL_HASH_SET_NBVALIDBITS(msglen);
 
     // write data
+    // NOTE: this works great even when *msg is unaligned. Verified in test case
     uint32_t *ptr = (uint32_t *)msg;
     for(int i=0; i<msglen; i+=4, ptr++) {
         HASH->DIN = *ptr;
     }
 
-    // do work
     __HAL_HASH_START_DIGEST();
 
     // wait for DCIS flag to be set
     while(__HAL_HASH_GET_FLAG(HASH_FLAG_DCIS) == RESET) {
-        // TODO: timeout?
+        // maybe: timeout?
     }
 
     // read result

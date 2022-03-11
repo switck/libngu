@@ -30,4 +30,9 @@ for mx in range(10, 2000, 73):
     print(" => %.0f %%" % covered)
     assert covered >= 97        # maybe bad luck
 
+# api test only; can't verify results
+ngu.random.reseed(123)
+ngu.random.reseed(456)
+ngu.random.reseed(0xffff_ffff)
+
 print('PASS - test_random')

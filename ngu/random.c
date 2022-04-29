@@ -30,9 +30,14 @@ extern uint32_t rng_get(void);
 # endif
 #endif
 
-#ifdef UNIX
+#if defined(__APPLE__) || defined(__FreeBSD__)
 # define CHIP_TRNG_SETUP()      
 # define CHIP_TRNG_32()         arc4random()
+#endif
+
+#ifdef __linux__
+# define CHIP_TRNG_SETUP()
+# define CHIP_TRNG_32()         random()
 #endif
 
 #ifndef CHIP_TRNG_SETUP

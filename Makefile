@@ -47,7 +47,7 @@ esp:
 	echo "Run: import ngu_tests.run"
 
 quick:
-	make -f Makefile.unix
+	make -f makefile.unix
 	(cd ngu/ngu_tests; make)
 	./ngu-micropython -c 'import ngu_tests.run'
 

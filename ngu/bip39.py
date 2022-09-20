@@ -293,6 +293,27 @@ _lookup = {'a':0, 'ab':0, 'ac':10, 'ad':24, 'ae':33, 'af':34, 'ag':37, 'ah':41, 
 'ye':2039, 'yo':2041, 'z':2044, 'ze':2044, 'zo':2046} # 225 entries
 
 
+def get_word_index(word):
+    # expectation is that this is faster than iterable.index()
+    # input string word; return int index in wordlist
+    # also accepts just first four distinctive characters of the word (if len > 4)
+    
+    if not (3 < len(word) < 8):
+        raise ValueError(word)
+	
+    try:
+    	# first two letters must be right
+        start_index = _lookup[word[:2]]
+    except KeyError:
+	raise ValueError(word)
+
+    for i, w in enumerate(wordlist_en[start_index:], start=start_index):
+        if word == w or word == w[:4]:
+            return i
+    else:
+        raise ValueError(word)
+
+
 def b2a_words(msg):
     "map binary to words, including a few bits of checksum, per BIP39 spec"
     l = len(msg)
@@ -332,11 +353,7 @@ def _split_lookup(phrase):
 
     rv = 0
     for w in phrase:
-        try:
-            idx = wordlist_en.index(w)
-        except ValueError:
-            raise ValueError(w)
-
+        idx = get_word_index(w)
         rv = (rv << 11) | idx
 
     return num, rv
@@ -434,6 +451,6 @@ def master_secret(words, pw=b''):
         import ngu
         return ngu.hash.pbkdf2_sha512(words, salt, 2048)
     except ImportError:
-        import wallycore 
+        import wallycore
         return wallycore.pbkdf2_hmac_sha512(words, salt, 0, 2048)
 

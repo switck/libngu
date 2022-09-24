@@ -1,4 +1,3 @@
-import sys
 
 try:
     import ngu
@@ -8,6 +7,24 @@ try:
     ripemd160 = ngu.hash.ripemd160
     double_sha256 = ngu.hash.sha256d
     sha256s = ngu.hash.sha256s
+
+    def expect2(func, msg, dig):
+        assert func(msg) == a2b_hex(dig), [func(msg), a2b_hex(dig)]
+
+
+    import uctypes
+
+    ba = bytearray(b'XXXabcYYY')
+    addr = uctypes.addressof(ba)
+    abc = uctypes.bytearray_at(addr + 3, 3)
+    assert abc == b'abc'
+    assert uctypes.addressof(abc) % 4 == 3
+
+    expect2(sha256s, abc, 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+    expect2(double_sha256, abc, '4f8b42c22dd3729b519ba6f68d2da7cc5b2d606d05daed5ad5128cc03e6c6358')
+    expect2(lambda x: sha512(x).digest(), abc,
+            'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f')
+
 except ImportError:
     import hashlib
     from binascii import b2a_hex, a2b_hex
@@ -65,22 +82,5 @@ expect(sha512, b'abc'*99, 'be0a8f07e572e068306b19fa0750f3cc6a11b5f0e0cf02ae7c944
 expect(sha512,
     b'abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu',
     '8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa17299aeadb6889018501d289e4900f7e4331b99dec4b5433ac7d329eeb6dd26545e96e55b874be909')
-
-if 1:
-    # unaligned data tests
-
-    def expect2(func, msg, dig):
-        assert func(msg) == a2b_hex(dig), [func(msg), a2b_hex(dig)]
-
-    import uctypes
-    ba = bytearray(b'XXXabcYYY')
-    addr = uctypes.addressof(ba)
-    abc = uctypes.bytearray_at(addr+3, 3)
-    assert abc == b'abc'
-    assert uctypes.addressof(abc) % 4 == 3
-
-    expect2(sha256s, abc, 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
-    expect2(double_sha256, abc, '4f8b42c22dd3729b519ba6f68d2da7cc5b2d606d05daed5ad5128cc03e6c6358')
-    expect2(lambda x: sha512(x).digest(), abc, 'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f')
 
 print('PASS - test_hash')

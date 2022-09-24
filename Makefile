@@ -49,7 +49,6 @@ esp:
 quick:
 	make -f makefile.unix
 	(cd ngu/ngu_tests; make)
-	./ngu-micropython -c 'import ngu_tests.run'
 
 relink:
 	$(RM) $(TARGET)

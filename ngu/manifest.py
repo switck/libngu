@@ -9,6 +9,7 @@ if not os.environ.get('EXCLUDE_NGU_TESTS', False):
         "ngu_tests/run.py",
         "ngu_tests/b39_data.py",
         "ngu_tests/b39_vectors.py",
+        "ngu_tests/b340_vectors.py",
         "ngu_tests/test_bip39.py",
         "ngu_tests/test_aes_gen.py",
         "ngu_tests/test_cert.py",

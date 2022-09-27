@@ -28,6 +28,12 @@ typedef struct  {
 
 typedef struct  {
     mp_obj_base_t base;
+    secp256k1_xonly_pubkey    pubkey;         // not allocated
+    int    parity;
+} mp_obj_xonly_pubkey_t;
+
+typedef struct  {
+    mp_obj_base_t base;
     secp256k1_ecdsa_recoverable_signature   sig;
 } mp_obj_sig_t;
 
@@ -38,6 +44,7 @@ typedef struct  {
 } mp_obj_keypair_t;
 
 STATIC const mp_obj_type_t s_pubkey_type;
+STATIC const mp_obj_type_t s_xonly_pubkey_type;
 STATIC const mp_obj_type_t s_sig_type;
 STATIC const mp_obj_type_t s_keypair_type;
 
@@ -140,6 +147,27 @@ STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size
     return MP_OBJ_FROM_PTR(o);
 }
 
+// Constructor for xonly pubkey
+STATIC mp_obj_t s_xonly_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+    mp_arg_check_num(n_args, n_kw, 1, 1, false);
+
+    mp_obj_xonly_pubkey_t *o = m_new_obj(mp_obj_xonly_pubkey_t);
+    o->base.type = type;
+
+    mp_buffer_info_t inp;
+    mp_get_buffer_raise(args[0], &inp, MP_BUFFER_READ);
+    if(inp.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("xonly pubkey len != 32"));
+    }
+    int ok = secp256k1_xonly_pubkey_parse(secp256k1_context_no_precomp, &o->pubkey, inp.buf);
+
+    if(ok != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_xonly_pubkey_parse"));
+    }
+
+    return MP_OBJ_FROM_PTR(o);
+}
+
 // output pubkey
 STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     mp_obj_pubkey_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -162,6 +190,26 @@ STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_pubkey_to_bytes_obj, 1, 2, s_pubkey_to_bytes);
+
+// output xonly pubkey
+STATIC mp_obj_t s_xonly_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
+    mp_obj_xonly_pubkey_t *self = MP_OBJ_TO_PTR(args[0]);
+
+    vstr_t vstr;
+    vstr_init_len(&vstr, 32);
+
+    secp256k1_xonly_pubkey_serialize(secp256k1_context_no_precomp, (uint8_t *)vstr.buf, &self->pubkey);
+
+    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_xonly_pubkey_to_bytes_obj, 1, 2, s_xonly_pubkey_to_bytes);
+
+// output xonly pubkey parity
+STATIC mp_obj_t s_xonly_pubkey_parity(mp_obj_t self_in) {
+    mp_obj_xonly_pubkey_t *self = MP_OBJ_TO_PTR(self_in);
+    return mp_obj_new_int(self->parity);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_xonly_pubkey_parity_obj, s_xonly_pubkey_parity);
 
 // output signature as 65 bytes
 STATIC mp_obj_t s_sig_to_bytes(mp_obj_t self_in) {
@@ -251,6 +299,97 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_obj, s_sign);
 
+
+STATIC mp_obj_t s_verify_schnorr(mp_obj_t compact_sig_in, mp_obj_t digest_in, mp_obj_t xonly_pubkey_in) {
+    mp_buffer_info_t compact_sig;
+    mp_get_buffer_raise(compact_sig_in, &compact_sig, MP_BUFFER_READ);
+    if(compact_sig.len != 64) {
+        mp_raise_ValueError(MP_ERROR_TEXT("compact sig len != 64"));
+    }
+    long unsigned int digest_len = 32;
+    mp_buffer_info_t digest;
+    mp_get_buffer_raise(digest_in, &digest, MP_BUFFER_READ);
+    if(digest.len != digest_len) {
+        mp_raise_ValueError(MP_ERROR_TEXT("md len != 32"));
+    }
+    if(mp_obj_get_type(xonly_pubkey_in) != &s_xonly_pubkey_type) {
+        mp_raise_ValueError(MP_ERROR_TEXT("has to be xonly pubkey type"));
+    }
+    mp_obj_xonly_pubkey_t *xonly_pub = MP_OBJ_TO_PTR(xonly_pubkey_in);
+    int ok = secp256k1_schnorrsig_verify(lib_ctx, compact_sig.buf, digest.buf, digest_len, &xonly_pub->pubkey);
+    if (ok != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_schnorrsig_verify"));
+    }
+    return mp_obj_new_int(ok);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_verify_schnorr_obj, s_verify_schnorr);
+
+STATIC mp_obj_t s_tagged_sha256(mp_obj_t tag_in, mp_obj_t msg_in) {
+//  Compute a tagged hash as defined in BIP-340.
+//
+//  This is useful for creating a message hash and achieving domain separation
+//  through an application-specific tag. This function returns
+//  SHA256(SHA256(tag)||SHA256(tag)||msg).
+    mp_buffer_info_t tag;
+    mp_get_buffer_raise(tag_in, &tag, MP_BUFFER_READ);
+    mp_buffer_info_t msg;
+    mp_get_buffer_raise(msg_in, &msg, MP_BUFFER_READ);
+    vstr_t rv;
+    vstr_init_len(&rv, 32);
+
+    int ok = secp256k1_tagged_sha256(lib_ctx, (uint8_t *)rv.buf, tag.buf, tag.len, msg.buf, msg.len);
+    if (ok != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_tagged_sha256 invalid arguments"));
+    }
+	return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_tagged_sha256_obj, s_tagged_sha256);
+
+
+STATIC mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t aux_rand_in)
+{
+    sec_setup_ctx();
+
+    mp_buffer_info_t digest;
+    mp_get_buffer_raise(digest_in, &digest, MP_BUFFER_READ);
+    if(digest.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("md len != 32"));
+    }
+    mp_buffer_info_t aux_rand;
+    mp_get_buffer_raise(aux_rand_in, &aux_rand, MP_BUFFER_READ);
+    if(aux_rand.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("aux rand len != 32"));
+    }
+
+    vstr_t rv;
+    vstr_init_len(&rv, 64);
+    int ok;
+    if(mp_obj_get_type(privkey_in) == &s_keypair_type) {
+    	mp_obj_keypair_t *keypair = MP_OBJ_TO_PTR(privkey_in);
+        ok = secp256k1_schnorrsig_sign32(lib_ctx, (uint8_t *)rv.buf, digest.buf, &keypair->keypair, aux_rand.buf);
+    } else {
+        // typical: raw privkey
+        mp_buffer_info_t privkey;
+        mp_get_buffer_raise(privkey_in, &privkey, MP_BUFFER_READ);
+        if(privkey.len != 32) {
+            mp_raise_ValueError(MP_ERROR_TEXT("privkey len != 32"));
+        }
+        int key_ok;
+		secp256k1_keypair keypair;
+		key_ok = secp256k1_keypair_create(lib_ctx, &keypair, privkey.buf);
+		if (!key_ok) {
+			mp_raise_ValueError(MP_ERROR_TEXT("invalid secret"));
+		}
+        ok = secp256k1_schnorrsig_sign32(lib_ctx, (uint8_t *)rv.buf, digest.buf, &keypair, aux_rand.buf);
+    }
+    if(!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_schnorrsig_sign"));
+    }
+
+    return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_schnorr_obj, s_sign_schnorr);
+
 // KEY PAIRS (private key, with public key computed)
 
 // Constructor for keypair
@@ -317,6 +456,56 @@ STATIC mp_obj_t s_keypair_pubkey(mp_obj_t self_in) {
     return rv;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_pubkey_obj, s_keypair_pubkey);
+
+STATIC mp_obj_t s_keypair_xonly_pubkey(mp_obj_t self_in) {
+    mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
+
+    sec_setup_ctx();
+
+    // no need to cache, already done by keypair code
+    mp_obj_xonly_pubkey_t *rv = m_new_obj(mp_obj_xonly_pubkey_t);
+    rv->base.type = &s_xonly_pubkey_type;
+
+    int ok = secp256k1_keypair_xonly_pub(lib_ctx, &rv->pubkey, &rv->parity, &self->keypair);
+    if(ok != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_keypair_xonly_pub"));
+    }
+
+    return rv;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_xonly_pubkey_obj, s_keypair_xonly_pubkey);
+
+STATIC mp_obj_t s_keypair_xonly_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in) {
+//  Tweak a keypair by adding tweak32 to the secret key and updating the public
+//  key accordingly.
+    mp_buffer_info_t tweak32;
+    mp_get_buffer_raise(tweak32_in, &tweak32, MP_BUFFER_READ);
+    if(tweak32.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("md len != 32"));
+    }
+    mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
+//  create new tweaked object rather than updating self
+    mp_obj_keypair_t *rv = m_new_obj(mp_obj_keypair_t);
+    rv->base.type = &s_keypair_type;
+
+    memcpy(&rv->keypair, &self->keypair, sizeof(s_keypair_type));
+
+    sec_setup_ctx();
+
+    int ok = secp256k1_keypair_xonly_tweak_add(lib_ctx, &rv->keypair, tweak32.buf);
+    if(ok != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_keypair_xonly_tweak_add invalid arguments"));
+    }
+	unsigned char seckey[32];
+	ok = secp256k1_keypair_sec(lib_ctx, seckey, &rv->keypair);
+	if (ok != 1) {
+		mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_keypair_xonly_tweak_add keypair_sec"));
+	}
+	memcpy(&rv->privkey, seckey, 32);
+    return rv;
+
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_xonly_tweak_add_obj, s_keypair_xonly_tweak_add);
 
 static int _my_ecdh_hash(unsigned char *output, const unsigned char *x32, const unsigned char *y32, void *data) {
     (void)data;
@@ -393,6 +582,12 @@ STATIC const mp_rom_map_elem_t s_pubkey_locals_dict_table[] = {
 };
 STATIC MP_DEFINE_CONST_DICT(s_pubkey_locals_dict, s_pubkey_locals_dict_table);
 
+STATIC const mp_rom_map_elem_t s_xonly_pubkey_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_xonly_pubkey_to_bytes_obj) },
+    { MP_ROM_QSTR(MP_QSTR_parity), MP_ROM_PTR(&s_xonly_pubkey_parity_obj) },
+};
+STATIC MP_DEFINE_CONST_DICT(s_xonly_pubkey_locals_dict, s_xonly_pubkey_locals_dict_table);
+
 STATIC const mp_obj_type_t s_pubkey_type = {
     { &mp_type_type },
     .name = MP_QSTR_secp256k1_pubkey,
@@ -400,10 +595,19 @@ STATIC const mp_obj_type_t s_pubkey_type = {
     .locals_dict = (void *)&s_pubkey_locals_dict,
 };
 
+STATIC const mp_obj_type_t s_xonly_pubkey_type = {
+    { &mp_type_type },
+    .name = MP_QSTR_secp256k1_xonly_pubkey,
+    .make_new = s_xonly_pubkey_make_new,
+    .locals_dict = (void *)&s_xonly_pubkey_locals_dict,
+};
+
 // privkeys and what you can do with them
 STATIC const mp_rom_map_elem_t s_keypair_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_privkey), MP_ROM_PTR(&s_keypair_privkey_obj) },
     { MP_ROM_QSTR(MP_QSTR_pubkey), MP_ROM_PTR(&s_keypair_pubkey_obj) },
+    { MP_ROM_QSTR(MP_QSTR_xonly_pubkey), MP_ROM_PTR(&s_keypair_xonly_pubkey_obj) },
+    { MP_ROM_QSTR(MP_QSTR_xonly_tweak_add), MP_ROM_PTR(&s_keypair_xonly_tweak_add_obj) },
     { MP_ROM_QSTR(MP_QSTR_ecdh_multiply), MP_ROM_PTR(&s_keypair_ecdh_multiply_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(s_keypair_locals_dict, s_keypair_locals_dict_table);
@@ -420,9 +624,13 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_secp256k1) },
 
     { MP_ROM_QSTR(MP_QSTR_pubkey), MP_ROM_PTR(&s_pubkey_type) },
+    { MP_ROM_QSTR(MP_QSTR_xonly_pubkey), MP_ROM_PTR(&s_xonly_pubkey_type) },
     { MP_ROM_QSTR(MP_QSTR_keypair), MP_ROM_PTR(&s_keypair_type) },
     { MP_ROM_QSTR(MP_QSTR_signature), MP_ROM_PTR(&s_sig_type) },
     { MP_ROM_QSTR(MP_QSTR_sign), MP_ROM_PTR(&s_sign_obj) },
+    { MP_ROM_QSTR(MP_QSTR_sign_schnorr), MP_ROM_PTR(&s_sign_schnorr_obj) },
+    { MP_ROM_QSTR(MP_QSTR_verify_schnorr), MP_ROM_PTR(&s_verify_schnorr_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tagged_sha256), MP_ROM_PTR(&s_tagged_sha256_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

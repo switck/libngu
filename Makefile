@@ -25,22 +25,20 @@ tags:
 test tests:
 	(cd ngu/ngu_tests; make tests)
 
-K1_CONF_FLAGS = --with-bignum=no --with-ecmult-window=2 --with-ecmult-gen-precision=2 \
-				--enable-module-recovery --enable-module-extrakeys --enable-experimental \
-				--enable-module-ecdh \
-				--enable-ecmult-static-precomputation
+K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-precision=2 --enable-module-recovery \
+				--enable-module-ecdh --enable-module-schnorrsig
 
 .PHONY: one-time
 one-time:
 	cd $(MPY_TOP); git submodule update
 	cd $(MPY_TOP)/mpy-cross; make
-	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make src/ecmult_static_context.h
+	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make precomp
 	
 # get ready to build library, but not full Micropython nor Unix test code
 .PHONY: min-one-time
 min-one-time:
 	cd libs; git submodule update --init bech32 cifra secp256k1
-	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make src/ecmult_static_context.h
+	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make precomp
 
 esp:
 	make -f Makefile.esp32 && make -f Makefile.esp32 deploy

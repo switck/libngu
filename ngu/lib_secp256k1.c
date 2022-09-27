@@ -7,4 +7,6 @@
 # define USE_EXTERNAL_DEFAULT_CALLBACKS
 
 # include "src/secp256k1.c"
+# include "src/precomputed_ecmult.c"
+# include "src/precomputed_ecmult_gen.c"
 #endif

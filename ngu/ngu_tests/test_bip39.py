@@ -22,15 +22,20 @@ try:
 except ImportError:
     sys.path.insert(0, '')      # bugfix
     from ubinascii import unhexlify as a2b_hex
-    pass
+    eng = None
 
 import bip39
 from ngu_tests import b39_data
 from ngu_tests import b39_vectors
 
+def seed_compact_form(seed_words):
+    return " ".join([w[:4] for w in seed_words.split(" ")])
+
 def test_vectors():
     for raw, words, ms, _ in b39_vectors.english[0:10]:
-        assert bip39.a2b_words(words) == a2b_hex(raw)
+        target = a2b_hex(raw)
+        assert bip39.a2b_words(words) == target
+        assert bip39.a2b_words(seed_compact_form(words)) == target
         got = bip39.master_secret(words.encode('utf'), a2b_hex('5452455a4f52'))
         assert got == a2b_hex(ms)
         
@@ -43,7 +48,9 @@ def test_b2a():
 def test_a2b():
     for value, words in b39_data.vectors:
         got = bip39.a2b_words(words)
+        got_compact = bip39.a2b_words(seed_compact_form(words))
         assert got == value
+        assert got_compact == value
 
 def test_guessing():
     for value, words in b39_data.vectors:
@@ -71,11 +78,20 @@ def test_prefix():
         else:
             assert final == w
     
+def test_lookup():
+    from bip39 import get_word_index
+
+    if not eng: return
+
+    for n, w in enumerate(eng.wordlist):
+        assert get_word_index(w) == n
+        assert get_word_index(w[0:4]) == n
 
 test_vectors()
 test_b2a()
 test_a2b()
 test_prefix()
 test_guessing()
+test_lookup()
 
 print('PASS - test_bip39')

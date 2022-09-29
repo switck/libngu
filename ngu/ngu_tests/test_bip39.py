@@ -22,7 +22,7 @@ try:
 except ImportError:
     sys.path.insert(0, '')      # bugfix
     from ubinascii import unhexlify as a2b_hex
-    pass
+    eng = None
 
 import bip39
 from ngu_tests import b39_data
@@ -78,11 +78,20 @@ def test_prefix():
         else:
             assert final == w
     
+def test_lookup():
+    from bip39 import get_word_index
+
+    if not eng: return
+
+    for n, w in enumerate(eng.wordlist):
+        assert get_word_index(w) == n
+        assert get_word_index(w[0:4]) == n
 
 test_vectors()
 test_b2a()
 test_a2b()
 test_prefix()
 test_guessing()
+test_lookup()
 
 print('PASS - test_bip39')

@@ -69,6 +69,15 @@ void secp256k1_default_error_callback_fn(const char* message, void* data)
 #endif
 }
 
+void ctx_randomize(void) {
+	unsigned char randomize[32];
+	my_random_bytes(randomize, 32);
+	int return_val = secp256k1_context_randomize(lib_ctx, randomize);
+    if(!return_val) {
+    	mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_context_randomize"));
+    }
+}
+
 void sec_setup_ctx(void)
 {
     if(lib_ctx) return;
@@ -92,6 +101,7 @@ void sec_setup_ctx(void)
     if(!lib_ctx) {
         mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("secp256k1_context_preallocated_create"));
     }
+	ctx_randomize();
 
     // static error callbacks already in place above, no need to setup
 }
@@ -316,6 +326,8 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter
     uint32_t    nonce_data[8] = { counter, 0, };
     uint8_t     *nonce_ptr = counter ? ((uint8_t *)nonce_data) : NULL;
 
+	ctx_randomize();
+
     int x = secp256k1_ecdsa_sign_recoverable(lib_ctx, &rv->sig, digest.buf, pk,
                                                 secp256k1_nonce_function_default, nonce_ptr);
     if(x != 1) {
@@ -390,6 +402,9 @@ STATIC mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t
 
     vstr_t rv;
     vstr_init_len(&rv, 64);
+
+    ctx_randomize();
+
     int ok;
     if(mp_obj_get_type(privkey_in) == &s_keypair_type) {
     	mp_obj_keypair_t *keypair = MP_OBJ_TO_PTR(privkey_in);

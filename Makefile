@@ -25,8 +25,7 @@ tags:
 test tests:
 	(cd ngu/ngu_tests; make tests)
 
-K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-precision=2 --enable-module-recovery \
-				--enable-module-ecdh --enable-module-schnorrsig
+K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-precision=2 --enable-module-recovery
 
 .PHONY: one-time
 one-time:

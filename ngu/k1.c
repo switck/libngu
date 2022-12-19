@@ -138,7 +138,7 @@ STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size
     mp_buffer_info_t inp;
     mp_get_buffer_raise(args[0], &inp, MP_BUFFER_READ);
     
-    int rv = secp256k1_ec_pubkey_parse(secp256k1_context_no_precomp, &o->pubkey, inp.buf, inp.len);
+    int rv = secp256k1_ec_pubkey_parse(secp256k1_context_static, &o->pubkey, inp.buf, inp.len);
 
     if(rv != 1) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_parse"));
@@ -159,7 +159,7 @@ STATIC mp_obj_t s_xonly_pubkey_make_new(const mp_obj_type_t *type, size_t n_args
     if(inp.len != 32) {
         mp_raise_ValueError(MP_ERROR_TEXT("xonly pubkey len != 32"));
     }
-    int ok = secp256k1_xonly_pubkey_parse(secp256k1_context_no_precomp, &o->pubkey, inp.buf);
+    int ok = secp256k1_xonly_pubkey_parse(secp256k1_context_static, &o->pubkey, inp.buf);
 
     if(ok != 1) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_xonly_pubkey_parse"));
@@ -182,7 +182,7 @@ STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     }
 
     size_t outlen = vstr.len;
-    secp256k1_ec_pubkey_serialize(secp256k1_context_no_precomp, (uint8_t *)vstr.buf, &outlen,
+    secp256k1_ec_pubkey_serialize(secp256k1_context_static, (uint8_t *)vstr.buf, &outlen,
             &self->pubkey,
             compressed ? SECP256K1_EC_COMPRESSED: SECP256K1_EC_UNCOMPRESSED );
 
@@ -198,7 +198,7 @@ STATIC mp_obj_t s_xonly_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     vstr_t vstr;
     vstr_init_len(&vstr, 32);
 
-    secp256k1_xonly_pubkey_serialize(secp256k1_context_no_precomp, (uint8_t *)vstr.buf, &self->pubkey);
+    secp256k1_xonly_pubkey_serialize(secp256k1_context_static, (uint8_t *)vstr.buf, &self->pubkey);
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
@@ -219,7 +219,7 @@ STATIC mp_obj_t s_sig_to_bytes(mp_obj_t self_in) {
     vstr_t vstr;
     vstr_init_len(&vstr, 65);
 
-    secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_context_no_precomp,
+    secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_context_static,
                 ((uint8_t *)vstr.buf)+1, &recid, &self->sig);
 
     // first byte is bitcoin-specific rec id

@@ -136,6 +136,55 @@ STATIC mp_obj_t c_segwit_decode(mp_obj_t addr_in)
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_segwit_decode_obj, c_segwit_decode);
 
+// BECH32
+
+STATIC mp_obj_t c_nip19_encode(mp_obj_t hrp_in, mp_obj_t prog_in)
+{
+    const char *hrp = mp_obj_str_get_str(hrp_in);
+
+    mp_buffer_info_t prog;
+    mp_get_buffer_raise(prog_in, &prog, MP_BUFFER_READ);
+    if (prog.len != 32) {
+    	mp_raise_ValueError(MP_ERROR_TEXT("key must be 32 bytes"));
+    }
+	bech32_encoding enc = BECH32_ENCODING_BECH32;
+
+    uint8_t data[65];
+    size_t datalen = 0;
+	convert_bits(data, &datalen, 5, prog.buf, prog.len, 8, 1);
+
+	char tmp[127];
+    int ok = bech32_encode(tmp, hrp, data, datalen, enc);
+    if(!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("nip19_encode"));
+    }
+
+    return mp_obj_new_str(tmp, strlen(tmp));
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(c_nip19_encode_obj, c_nip19_encode);
+
+
+STATIC mp_obj_t c_nip19_decode(mp_obj_t str_in)
+{
+    const char *str = mp_obj_str_get_str(str_in);
+
+    uint8_t data[84];
+    char hrp_actual[84];
+    size_t data_len;
+
+    bech32_encoding enc = bech32_decode(hrp_actual, data, &data_len, str);
+    if (enc == BECH32_ENCODING_NONE) {
+    	mp_raise_ValueError(MP_ERROR_TEXT("nip19_decode"));
+    }
+    if (enc == BECH32_ENCODING_BECH32M) {
+    	mp_raise_ValueError(MP_ERROR_TEXT("must be bech32 encoding not bech32m"));
+    }
+    uint8_t res[65];
+    size_t reslen = 0;
+    convert_bits(res, &reslen, 8, data, data_len, 5, 0);
+    return mp_obj_new_bytes(res, reslen);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_nip19_decode_obj, c_nip19_decode);
 
 
 STATIC const mp_rom_map_elem_t globals_table[] = {
@@ -149,6 +198,9 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
 
     { MP_ROM_QSTR(MP_QSTR_segwit_encode), MP_ROM_PTR(&c_segwit_encode_obj) },
     { MP_ROM_QSTR(MP_QSTR_segwit_decode), MP_ROM_PTR(&c_segwit_decode_obj) },
+
+    { MP_ROM_QSTR(MP_QSTR_nip19_encode), MP_ROM_PTR(&c_nip19_encode_obj) },
+    { MP_ROM_QSTR(MP_QSTR_nip19_decode), MP_ROM_PTR(&c_nip19_decode_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

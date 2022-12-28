@@ -25,6 +25,7 @@ Name is "Number Go Up" ... because need that.
 ## Install
 
 - `pushd libs/mpy; git apply ../../mpy.patch; popd` patch micropython 
+- `pushd libs/bech32; git apply ../../bech32.patch; popd` patch bech32 (for nip-19)
 - `make one-time` does submodule bullshit, configures K1 lib
 - `make quick` compiles Unix micropython port, runs tests
 - can play with `./ngu-micropython` binary on your desktop

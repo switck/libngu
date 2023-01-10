@@ -87,7 +87,10 @@ target_tweaked_xonly_pub = b'lT\xe8\x84`\xbe0\x97c\x89\xc3\x90\xfa\xdeR!\xada\xe
 target_tweaked_pub = b'\x03' + target_tweaked_xonly_pub
 target_tweaked_privkey = b'0\xaf\xed(\xf1}Z\xc9z#@rI\x8f\xd3\xbb\xa3 ~\x1d2.\xa5WN\xe6\xdci\xbdsM\xee'
 kp = ngu.secp256k1.keypair(secret)
+xo_pk = kp.xonly_pubkey()
 kpt = kp.xonly_tweak_add(tweak)
+xo_pkt = xo_pk.tweak_add(tweak)
+assert xo_pkt.to_bytes() == target_tweaked_xonly_pub
 assert kpt.privkey() == target_tweaked_privkey
 assert kpt.pubkey().to_bytes() == target_tweaked_pub
 assert kpt.xonly_pubkey().to_bytes() == target_tweaked_xonly_pub
@@ -98,7 +101,20 @@ kp0 = kp.xonly_tweak_add(tweak)
 assert kp0.privkey() == kp.privkey()
 assert kp0.pubkey().to_bytes() == kp.pubkey().to_bytes()
 assert kp0.xonly_pubkey().to_bytes() == kp.xonly_pubkey().to_bytes()
+# xonly pubkey tweaking with zero (MUST return the same xonly pubkey)
+xo_pk = kp.xonly_pubkey()
+xo_pkt = xo_pk.tweak_add(tweak)
+assert xo_pk.to_bytes() == xo_pkt.to_bytes()
 
+# compare keypair and xonly tweaking
+for i in range(10):
+    tweak = ngu.random.bytes(32)
+    kp = ngu.secp256k1.keypair()
+    xo_pk = kp.xonly_pubkey()
+    kpt = kp.xonly_tweak_add(tweak)
+    xo_pkt = xo_pk.tweak_add(tweak)
+    assert kpt.xonly_pubkey().to_bytes() == xo_pkt.to_bytes()
+    assert kpt.xonly_pubkey().parity() == xo_pkt.parity()
 
 # schnorr
 for i in range(10):

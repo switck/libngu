@@ -211,6 +211,33 @@ STATIC mp_obj_t s_xonly_pubkey_parity(mp_obj_t self_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_xonly_pubkey_parity_obj, s_xonly_pubkey_parity);
 
+// add tweak32 to xonly pubkey
+STATIC mp_obj_t s_xonly_pubkey_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in) {
+    int rc;
+    mp_buffer_info_t tweak32;
+    mp_get_buffer_raise(tweak32_in, &tweak32, MP_BUFFER_READ);
+    if(tweak32.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("tweak32 len != 32"));
+    }
+    mp_obj_xonly_pubkey_t *self = MP_OBJ_TO_PTR(self_in);
+
+    secp256k1_pubkey pk;
+    rc = secp256k1_xonly_pubkey_tweak_add(secp256k1_context_static, &pk, &self->pubkey, tweak32.buf);
+    if(rc != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_xonly_pubkey_tweak_add"));
+    }
+    //  create new tweaked object rather than updating self
+    mp_obj_xonly_pubkey_t *rv = m_new_obj(mp_obj_xonly_pubkey_t);
+    rv->base.type = &s_xonly_pubkey_type;
+    rc = secp256k1_xonly_pubkey_from_pubkey(secp256k1_context_static, &rv->pubkey, &rv->parity, &pk);
+    if(rc != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_xonly_pubkey_from_pubkey"));
+    }
+    return MP_OBJ_FROM_PTR(rv);
+
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_xonly_pubkey_tweak_add_obj, s_xonly_pubkey_tweak_add);
+
 // output signature as 65 bytes
 STATIC mp_obj_t s_sig_to_bytes(mp_obj_t self_in) {
     mp_obj_sig_t *self = MP_OBJ_TO_PTR(self_in);
@@ -481,7 +508,7 @@ STATIC mp_obj_t s_keypair_xonly_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in)
     mp_buffer_info_t tweak32;
     mp_get_buffer_raise(tweak32_in, &tweak32, MP_BUFFER_READ);
     if(tweak32.len != 32) {
-        mp_raise_ValueError(MP_ERROR_TEXT("md len != 32"));
+        mp_raise_ValueError(MP_ERROR_TEXT("tweak32 len != 32"));
     }
     mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
 //  create new tweaked object rather than updating self
@@ -585,6 +612,7 @@ STATIC MP_DEFINE_CONST_DICT(s_pubkey_locals_dict, s_pubkey_locals_dict_table);
 STATIC const mp_rom_map_elem_t s_xonly_pubkey_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_xonly_pubkey_to_bytes_obj) },
     { MP_ROM_QSTR(MP_QSTR_parity), MP_ROM_PTR(&s_xonly_pubkey_parity_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tweak_add), MP_ROM_PTR(&s_xonly_pubkey_tweak_add_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(s_xonly_pubkey_locals_dict, s_xonly_pubkey_locals_dict_table);
 

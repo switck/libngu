@@ -515,9 +515,12 @@ STATIC mp_obj_t s_keypair_xonly_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in)
     mp_obj_keypair_t *rv = m_new_obj(mp_obj_keypair_t);
     rv->base.type = &s_keypair_type;
 
-    memcpy(&rv->keypair, &self->keypair, sizeof(s_keypair_type));
-
     sec_setup_ctx();
+
+    int key_ok = secp256k1_keypair_create(lib_ctx, &rv->keypair, self->privkey);
+    if(key_ok != 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_keypair_xonly_tweak_add secp256k1_keypair_create"));
+    }
 
     int ok = secp256k1_keypair_xonly_tweak_add(lib_ctx, &rv->keypair, tweak32.buf);
     if(ok != 1) {

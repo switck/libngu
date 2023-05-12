@@ -3,6 +3,9 @@ MPY_TOP ?= libs/mpy
 S_TOP ?= libs/secp256k1
 MBED_TOP ?= $(MPY_TOP)/lib/mbedtls
 
+BECH32_PATCH ?= cd libs/bech32; git apply ../../bech32.patch || true
+MPY_PATCH    ?=	cd libs/mpy; git apply ../../mpy.patch || true
+
 all: $(TARGET)
 
 $(TARGET): $(REQUIRES)
@@ -32,6 +35,8 @@ K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-kb=2 --enable-module-re
 .PHONY: one-time
 one-time:
 	cd $(MPY_TOP); git submodule update
+	$(BECH32_PATCH)
+	$(MPY_PATCH)
 	cd $(MPY_TOP)/mpy-cross; make
 	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make precomp
 	
@@ -39,6 +44,8 @@ one-time:
 .PHONY: min-one-time
 min-one-time:
 	cd libs; git submodule update --init bech32 cifra secp256k1
+	$(BECH32_PATCH)
+	$(MPY_PATCH)
 	cd $(S_TOP); ./autogen.sh && ./configure $(K1_CONF_FLAGS) && make precomp
 
 esp:

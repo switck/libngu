@@ -22,14 +22,15 @@ typedef struct  {
     uint8_t             hash160[20];
     int                 depth;
     uint32_t            child_num;
-    uint32_t            parent_fp;
+    uint8_t             parent_fp[4];
     bool                have_private;
 #ifdef EXTRA_DEBUG
     char                path[40];       // debug aid
-    uint32_t            root_fp;
+    uint8_t             root_fp[4];
 #endif
 } mp_obj_hdnode_t;
 
+uint8_t ZERO[4] = {0x00,0x00,0x00,0x00};
 STATIC const mp_obj_type_t s_hdnode_type;
 
 static inline uint8_t *write_be32(uint8_t *p, uint32_t v)
@@ -85,10 +86,10 @@ static inline void _calc_hash160(mp_obj_hdnode_t *self)
     hash160(self->pubkey, 33, self->hash160);
 }
 
-static uint32_t _calc_my_fp(mp_obj_hdnode_t *self)
+static void _calc_my_fp(mp_obj_hdnode_t *self, uint8_t *out)
 {
     uint8_t *p = self->hash160;
-    return read_be32(&p);
+    memcpy(&out[0], p, 4);
 }
 
 // Constructor: makes empty/invalid obj
@@ -199,7 +200,8 @@ STATIC mp_obj_t s_hdnode_serialize(mp_obj_t self_in, mp_obj_t version_in, mp_obj
 
     p = write_be32(p, version);
     *(p++) = self->depth;
-    p = write_be32(p, self->parent_fp);
+    memcpy(p, self->parent_fp, 4);
+    p += 4;
     p = write_be32(p, self->child_num);
     memcpy(p, self->chain_code, 32);
     p += 32;
@@ -254,7 +256,8 @@ STATIC mp_obj_t s_hdnode_deserialize(mp_obj_t self_in, mp_obj_t encoded) {
 
     uint32_t version = read_be32(&p);
     self->depth = *(p++);
-    self->parent_fp = read_be32(&p);
+    memcpy(self->parent_fp, p, 4);
+    p += 4;
     self->child_num = read_be32(&p);
 
     memcpy(self->chain_code, p, 32);
@@ -279,7 +282,7 @@ STATIC mp_obj_t s_hdnode_deserialize(mp_obj_t self_in, mp_obj_t encoded) {
 
 #ifdef EXTRA_DEBUG
     self->path[0] = 0;
-    self->root_fp = 0;
+    memcpy(self->root_fp, &ZERO, 4);
     if(self->depth) {
         snprintf(self->path, sizeof(self->path), "m/_/%d", (int)(self->child_num & 0x7fffffff));
         if( self->child_num & 0x80000000) {
@@ -308,12 +311,12 @@ STATIC mp_obj_t s_hdnode_from_master(mp_obj_t self_in, mp_obj_t master_secret_in
     memcpy(self->chain_code, I.lr.right, 32);
     self->depth = 0;
     self->child_num = 0;
-    self->have_private = true; 
-    self->parent_fp = 0;
+    self->have_private = true;
+    memcpy(self->parent_fp, &ZERO, 4);
 
 #ifdef EXTRA_DEBUG
     self->path[0] = 0;
-    self->root_fp = 0;
+    memcpy(self->root_fp, &ZERO, 4);
 #endif
 
     _calc_pubkey(self);
@@ -342,11 +345,11 @@ STATIC mp_obj_t s_hdnode_from_chaincode_privkey(mp_obj_t self_in, mp_obj_t chain
     self->depth = 0;
     self->child_num = 0;
     self->have_private = true; 
-    self->parent_fp = 0;
+    memcpy(self->parent_fp, &ZERO, 4);
 
 #ifdef EXTRA_DEBUG
     self->path[0] = 0;
-    self->root_fp = 0;
+    memcpy(self->root_fp, &ZERO, 4);
 #endif
 
     _calc_pubkey(self);
@@ -363,10 +366,10 @@ STATIC mp_obj_t s_hdnode_censor(mp_obj_t self_in) {
 
     self->depth = 0;
     self->child_num = 0;
-    self->parent_fp = 0;
+    memcpy(self->parent_fp, &ZERO, 4);
 #ifdef EXTRA_DEBUG
     self->path[0] = 0;
-    self->root_fp = 0;
+    memcpy(self->root_fp, &ZERO, 4);
 #endif
 
     return self_in;
@@ -379,7 +382,8 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in, mp_obj
     raise_on_invalid(self);
 
     uint32_t next_child = mp_obj_get_int(next_child_in);
-    uint32_t parent_fp = _calc_my_fp(self);
+    uint8_t parent_fp[4];
+    _calc_my_fp(self, parent_fp);
 
     bool hard = !!mp_obj_get_int(hard_in);
     if(hard) next_child |= 0x80000000;
@@ -429,11 +433,11 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in, mp_obj
     memcpy(self->chain_code, I.lr.right, 32);
     self->depth += 1;
     self->child_num = next_child;
-    self->parent_fp = parent_fp;
+    memcpy(self->parent_fp, &parent_fp, 4);
 
 #ifdef EXTRA_DEBUG
     if(self->depth == 1) {
-        self->root_fp = parent_fp;
+        memcpy(self->root_fp, &parent_fp[0], 4);
     }
     if(strlen(self->path) >= sizeof(self->path)-12) {
         strcpy(self->path, "/_");
@@ -470,7 +474,7 @@ STATIC mp_obj_t s_hdnode_parent_fp(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
     raise_on_invalid(self);
 
-    return mp_obj_new_int_from_uint(self->parent_fp);
+    return mp_obj_new_bytes(self->parent_fp, 4);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_parent_fp_obj, s_hdnode_parent_fp);
 
@@ -478,9 +482,10 @@ STATIC mp_obj_t s_hdnode_my_fp(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
     raise_on_invalid(self);
 
-    uint32_t rv = _calc_my_fp(self);
+    uint8_t rv[4];
+    _calc_my_fp(self, rv);
 
-    return mp_obj_new_int_from_uint(rv);
+    return mp_obj_new_bytes(rv, 4);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_hdnode_my_fp_obj, s_hdnode_my_fp);
 
@@ -517,13 +522,12 @@ STATIC void s_hdnode_repr(const mp_print_t *print, mp_obj_t self_in, mp_print_ki
         mp_printf(print, "<HDNode: invalid>");
     } else if(self->depth == 0) {
         mp_printf(print, "<HDNode: m=%02x%02x%02x%02x>",
-            self->hash160[0], self->hash160[1], self->hash160[2], self->hash160[3]);
+            self->hash160[0], self->hash160[1], self->hash160[2], self->hash160[3]
+        );
     } else {
-        mp_printf(print, "<HDNode: (m=%02x%02x%02x%02x)%s>", 
-            (self->root_fp >> 24) & 0xff, 
-            (self->root_fp >> 16) & 0xff, 
-            (self->root_fp >> 8) & 0xff, 
-            self->root_fp & 0xff, self->path);
+        mp_printf(print, "<HDNode: (m=%02x%02x%02x%02x)%s>",
+            self->root_fp[0], self->root_fp[1], self->root_fp[2], self->root_fp[3], self->path
+        );
     }
 }
 #endif

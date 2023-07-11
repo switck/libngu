@@ -7,6 +7,7 @@ try:
 
     with open('test_hdnode_gen.py', 'wt') as fd:
         print("import gc, ngu  # auto-gen", file=fd)
+        print("from ubinascii import hexlify as b2a_hex  # auto-gen", file=fd)
         print("HDNode = ngu.hdnode.HDNode", file=fd)
 
         print("for i in range(3):", file=fd)
@@ -26,7 +27,7 @@ try:
             print("  a = HDNode(); a.from_master(%r)" % ms, file=fd)
             print("  assert a.pubkey() == %r" % pub, file=fd)
             print("  assert a.privkey() == %r" % priv, file=fd)
-            print("  assert a.my_fp() == 0x%s" % fp.hex(), file=fd)
+            print("  assert b2a_hex(a.my_fp()).decode() == '%s'" % fp.hex(), file=fd)
             print("  assert a.chain_code() == %r" % bytes(cc), file=fd)
             print("  assert a.serialize(0x488ade4, 1) == %r" % xprv, file=fd)
             print("  assert a.serialize(0x488b21e, 0) == %r" % xpub, file=fd)
@@ -46,6 +47,7 @@ V_XPRV = 0x0488ade4
 V_XPUB = 0x0488b21e
 
 from ubinascii import unhexlify as a2b_hex
+from ubinascii import hexlify as b2a_hex
 
 import ngu, gc
 #from ngu.hdnode import HDNode
@@ -76,9 +78,9 @@ def test_derive():
     a = HDNode()
     a.from_master(b'1'*32)
     assert a.depth() == 0
-    assert a.parent_fp() == 0
+    assert a.parent_fp() == b"\x00\x00\x00\x00"
     m_fp = a.my_fp()
-    assert m_fp == 0x600f4faf           # matches wallycore
+    assert b2a_hex(m_fp).decode() == "600f4faf"       # matches wallycore
     p1 = a.derive(43, False).pubkey()
 
     b = HDNode()

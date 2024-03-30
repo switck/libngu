@@ -6,6 +6,8 @@ Name is "Number Go Up" ... because need that.
 
 **Absoletely none of SHITCOINS allowed here**
 
+**NEW POLICY** If I don't know you, I don't merge you! Thanks **XZ**!
+
 ## Primatives
 
 - using [libsecp256k1](https://github.com/bitcoin-core/secp256k1) for everything, except:

@@ -1,8 +1,10 @@
 //
-// hash.c - less common or special hashers
+// hash.c - hash functions
 //
+// - sha256, single & double
 // - sha512
 // - ripemd160
+// - has160, bitcoin specific
 //
 #include "py/runtime.h"
 #include <string.h>
@@ -133,16 +135,7 @@ STATIC mp_obj_t hm_single_sha256(mp_obj_t arg) {
     vstr_t vstr;
     vstr_init_len(&vstr, 32);
 
-#if MICROPY_SSL_MBEDTLS
-    mbedtls_sha256_context ctx;
-    mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, inp.buf, inp.len);
-    mbedtls_sha256_finish_ret(&ctx, (uint8_t *)vstr.buf);
-    mbedtls_sha256_free(&ctx);
-#else
-    cf_hash(&cf_sha256, inp.buf, inp.len, (uint8_t *)vstr.buf);
-#endif
+    sha256_single(inp.buf, inp.len, (uint8_t *)vstr.buf);
     
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
@@ -283,10 +276,10 @@ void ripemd160(const uint8_t *msg, int msglen, uint8_t digest[20])
     }
 
 #if !defined(MP_ENDIANNESS_LITTLE)
-#error "untested; suspect endian challenge here"
+#error "untested; suspect endian challenges here"
 #endif
 
-    if(((uint32_t)digest) & 0x3) {
+    if(((size_t)digest) & 0x3) {
         // unaligned case
         uint32_t    ctx[5];
 
@@ -308,28 +301,8 @@ void hash160(const uint8_t *msg, int msglen, uint8_t digest[20])
     // hash160(x) = ripemd160(sha256(x))
     uint8_t tmp[32];
 
-#if MICROPY_SSL_MBEDTLS
-    mbedtls_sha256_context ctx;
-    mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, msg, msglen);
-    mbedtls_sha256_finish_ret(&ctx, tmp);
-    mbedtls_sha256_free(&ctx);
-    
-#if 0
-    mbedtls_ripemd160_context    r_ctx;
-    mbedtls_ripemd160_init(&r_ctx);
-    mbedtls_ripemd160_starts_ret(&r_ctx);
-    mbedtls_ripemd160_update_ret(&r_ctx, tmp, 32);
-    mbedtls_ripemd160_finish_ret(&r_ctx, digest);
-    mbedtls_ripemd160_free(&r_ctx);
-#endif
+    sha256_single(msg, msglen, tmp);
     ripemd160(tmp, 32, digest);
-
-#else
-    cf_hash(&cf_sha256, msg, msglen, tmp);
-    ripemd160(tmp, 32, digest);
-#endif
 }
 
 void sha256_single(const uint8_t *msg, int msglen, uint8_t digest[32])
@@ -341,8 +314,63 @@ void sha256_single(const uint8_t *msg, int msglen, uint8_t digest[32])
     mbedtls_sha256_update_ret(&ctx, msg, msglen);
     mbedtls_sha256_finish_ret(&ctx, digest);
     mbedtls_sha256_free(&ctx);
+#elif defined(HASH_DATATYPE_8B)
+    // Hardware Accelerated on this board.
+
+    // setup
+    MODIFY_REG(HASH->CR, HASH_CR_DATATYPE, HASH_DATATYPE_8B);
+    __HAL_HASH_RESET_MDMAT();
+    MODIFY_REG(HASH->CR, HASH_CR_LKEY|HASH_CR_ALGO|HASH_CR_MODE|HASH_CR_INIT,
+                            HASH_ALGOSELECTION_SHA256 | HASH_CR_INIT);
+    __HAL_HASH_SET_NBVALIDBITS(msglen);
+
+    // write data
+    // NOTE: this works great even when *msg is unaligned. Verified in test case
+    uint32_t *ptr = (uint32_t *)msg;
+    for(int i=0; i<msglen; i+=4, ptr++) {
+        HASH->DIN = *ptr;
+    }
+
+    __HAL_HASH_START_DIGEST();
+
+    // wait for DCIS flag to be set
+    while(__HAL_HASH_GET_FLAG(HASH_FLAG_DCIS) == RESET) {
+        // maybe: timeout?
+    }
+
+    // read result
+    uint32_t *out = (uint32_t *)digest;
+
+    *(out++) = __REV(HASH->HR[0]);
+    *(out++) = __REV(HASH->HR[1]);
+    *(out++) = __REV(HASH->HR[2]);
+    *(out++) = __REV(HASH->HR[3]);
+    *(out++) = __REV(HASH->HR[4]);
+    *(out++) = __REV(HASH_DIGEST->HR[5]);
+    *(out++) = __REV(HASH_DIGEST->HR[6]);
+    *(out++) = __REV(HASH_DIGEST->HR[7]);
 #else
     cf_hash(&cf_sha256, msg, msglen, digest);
+#endif
+}
+    
+void sha256_double(const uint8_t *msg, int msglen, uint8_t digest[32])
+{
+#if MICROPY_SSL_MBEDTLS
+    // re-used ctx here (slight savings in stack depth)
+    mbedtls_sha256_context ctx;
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts_ret(&ctx, 0);
+    mbedtls_sha256_update_ret(&ctx, msg, msglen);
+    mbedtls_sha256_finish_ret(&ctx, digest);
+
+    mbedtls_sha256_starts_ret(&ctx, 0);
+    mbedtls_sha256_update_ret(&ctx, digest, 32);
+    mbedtls_sha256_finish_ret(&ctx, digest);
+    mbedtls_sha256_free(&ctx);
+#else
+    sha256_single(msg, msglen, digest);
+    sha256_single(digest, 32, digest);
 #endif
 }
 
@@ -357,25 +385,5 @@ void hmac_sha512(const uint8_t *key, uint32_t key_len,
     mbedtls_md_hmac(md_algo, key, key_len, data, data_len, result->both);
 #else
     cf_hmac(key, key_len, data, data_len, result->both, &cf_sha512);
-#endif
-}
-
-    
-void sha256_double(const uint8_t *msg, int msglen, uint8_t digest[32])
-{
-#if MICROPY_SSL_MBEDTLS
-    mbedtls_sha256_context ctx;
-    mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, msg, msglen);
-    mbedtls_sha256_finish_ret(&ctx, digest);
-
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, digest, 32);
-    mbedtls_sha256_finish_ret(&ctx, digest);
-    mbedtls_sha256_free(&ctx);
-#else
-    cf_hash(&cf_sha256, msg, msglen, digest);
-    cf_hash(&cf_sha256, digest, 32, digest);
 #endif
 }

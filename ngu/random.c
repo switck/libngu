@@ -30,9 +30,14 @@ extern uint32_t rng_get(void);
 # endif
 #endif
 
-#ifdef UNIX
+#if defined(__APPLE__) || defined(__FreeBSD__)
 # define CHIP_TRNG_SETUP()      
 # define CHIP_TRNG_32()         arc4random()
+#endif
+
+#ifdef __linux__
+# define CHIP_TRNG_SETUP()
+# define CHIP_TRNG_32()         random()
 #endif
 
 #ifndef CHIP_TRNG_SETUP
@@ -154,12 +159,22 @@ STATIC mp_obj_t random_bytes(mp_obj_t count_in)
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_bytes_obj, random_bytes);
 
 
+STATIC mp_obj_t random_reseed(mp_obj_t arg)
+{
+    yasmarang_pad = mp_obj_get_int_truncated(arg);
+
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_reseed_obj, random_reseed);
+
+
 STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_random) },
 
     { MP_ROM_QSTR(MP_QSTR_bytes), MP_ROM_PTR(&random_bytes_obj) },
     { MP_ROM_QSTR(MP_QSTR_uint32), MP_ROM_PTR(&random_uint32_obj) },
     { MP_ROM_QSTR(MP_QSTR_uniform), MP_ROM_PTR(&random_uniform_obj) },
+    { MP_ROM_QSTR(MP_QSTR_reseed), MP_ROM_PTR(&random_reseed_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

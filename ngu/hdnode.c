@@ -406,7 +406,7 @@ STATIC mp_obj_t s_hdnode_derive(mp_obj_t self_in, mp_obj_t next_child_in, mp_obj
 
     int ok;
     if(self->have_private) {
-        ok = secp256k1_ec_privkey_tweak_add(lib_ctx, self->privkey, I.lr.left);
+        ok = secp256k1_ec_seckey_tweak_add(lib_ctx, self->privkey, I.lr.left);
         if(!ok) goto fail;
 
         _calc_pubkey(self);

@@ -357,6 +357,41 @@ STATIC mp_obj_t s_hdnode_from_chaincode_privkey(mp_obj_t self_in, mp_obj_t chain
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_hdnode_from_chaincode_privkey_obj, s_hdnode_from_chaincode_privkey);
 
 
+STATIC mp_obj_t s_hdnode_from_chaincode_pubkey(mp_obj_t self_in, mp_obj_t chain_code_in, mp_obj_t pubkey_in) {
+    mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
+
+    mp_buffer_info_t cc, pk;
+    mp_get_buffer_raise(chain_code_in, &cc, MP_BUFFER_READ);
+    mp_get_buffer_raise(pubkey_in, &pk, MP_BUFFER_READ);
+
+    if(cc.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("chaincode len"));
+    }
+    secp256k1_pubkey pk_check;
+    if (!secp256k1_ec_pubkey_parse(secp256k1_context_static, &pk_check, pk.buf, pk.len)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("pubkey invalid"));
+    }
+    size_t outlen = 33;
+    secp256k1_ec_pubkey_serialize(secp256k1_context_static, self->pubkey, &outlen,
+                                  &pk_check, SECP256K1_EC_COMPRESSED);
+
+    memcpy(self->chain_code, cc.buf, 32);
+    self->depth = 0;
+    self->child_num = 0;
+    self->have_private = false;
+    self->parent_fp = 0;
+
+#ifdef EXTRA_DEBUG
+    self->path[0] = 0;
+    self->root_fp = 0;
+#endif
+
+    _calc_hash160(self);
+
+    return self_in;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_hdnode_from_chaincode_pubkey_obj, s_hdnode_from_chaincode_pubkey);
+
 STATIC mp_obj_t s_hdnode_censor(mp_obj_t self_in) {
     mp_obj_hdnode_t *self = MP_OBJ_TO_PTR(self_in);
     raise_on_invalid(self);
@@ -537,6 +572,7 @@ STATIC const mp_rom_map_elem_t s_hdnode_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_deserialize), MP_ROM_PTR(&s_hdnode_deserialize_obj) },
     { MP_ROM_QSTR(MP_QSTR_from_master), MP_ROM_PTR(&s_hdnode_from_master_obj) },
     { MP_ROM_QSTR(MP_QSTR_from_chaincode_privkey), MP_ROM_PTR(&s_hdnode_from_chaincode_privkey_obj) },
+    { MP_ROM_QSTR(MP_QSTR_from_chaincode_pubkey), MP_ROM_PTR(&s_hdnode_from_chaincode_pubkey_obj) },
     { MP_ROM_QSTR(MP_QSTR_derive), MP_ROM_PTR(&s_hdnode_derive_obj) },
     { MP_ROM_QSTR(MP_QSTR_addr_help), MP_ROM_PTR(&s_hdnode_addr_help_obj) },
 

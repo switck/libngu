@@ -8,7 +8,7 @@ Name is "Number Go Up" ... because need that.
 
 **NEW POLICY** If I don't know you, I don't merge you! Thanks **XZ**!
 
-## Primatives
+## Primitives
 
 - using [libsecp256k1](https://github.com/bitcoin-core/secp256k1) for everything, except:
 - [mbedtls](https://github.com/ARMmbed/mbedtls) if already present on target (ESP32 uses for TLS)

@@ -47,6 +47,10 @@ V_XPUB = 0x0488b21e
 
 from ubinascii import unhexlify as a2b_hex
 
+# provably unspendable
+# https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs
+H = a2b_hex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
+
 import ngu, gc
 #from ngu.hdnode import HDNode
 HDNode = ngu.hdnode.HDNode
@@ -54,23 +58,22 @@ HDNode = ngu.hdnode.HDNode
 def test_serial():
     a = HDNode()
     a.deserialize('xprv9s21ZrQH143K3FperxDp8vFsFycKCRcJGAFmcV7umQmcnMZaLtZRt13QJDsoS5F6oYT6BB4sS6zmTmyQAEkJKxJ7yByDNtRe5asP2jFGhT6')
-    s = a.serialize(0x0488B21E, 0)
+    s = a.serialize(V_XPUB, 0)
     assert s[0:4] == 'xpub'
     assert len(ngu.codecs.b58_decode(s)) == 78
 
     b = HDNode()
     vo = b.deserialize(s)
-    assert vo == 0x0488B21E, hex(vo)
+    assert vo == V_XPUB, hex(vo)
 
 def test_b39():
-    import bip39
     from ngu_tests import b39_vectors
 
     for raw, words, ms, xprv in b39_vectors.english:
         ms = a2b_hex(ms)
         x = HDNode()
         x.from_master(ms)
-        assert x.serialize(0x0488ADE4, 1) == xprv
+        assert x.serialize(V_XPRV, 1) == xprv
 
 def test_derive():
     a = HDNode()
@@ -92,15 +95,88 @@ def test_derive():
     assert c != b
     assert c.pubkey() == b.pubkey()
 
-def test_misc():
-    a = HDNode()
-    a.from_master(b'1'*32)
-    a.derive(234234, False)
+def test_from_chaincode_and_key():
+    for x, idx in [(b"1", 234234), (b"a", 0), (b"f", 10)]:
+        a = HDNode()
+        a.from_master(x*32)
+        a.derive(idx, False)
 
-    b = HDNode().from_chaincode_privkey(a.chain_code(), a.privkey())
-    a.censor()
-    assert a.serialize(0x123, 0) == b.serialize(0x123, 0)
-    assert a.serialize(0x123, 1) == b.serialize(0x123, 1)
+        b = HDNode().from_chaincode_privkey(a.chain_code(), a.privkey())
+        a.censor()
+        a_pub_ext = a.serialize(V_XPUB, 0)
+        assert a_pub_ext == b.serialize(V_XPUB, 0)
+        assert a.serialize(V_XPRV, 1) == b.serialize(V_XPRV, 1)
+
+        c = HDNode().from_chaincode_pubkey(a.chain_code(), a.pubkey())
+        assert a_pub_ext == c.serialize(V_XPUB, 0)
+
+        a.derive(idx, False)
+        b.derive(idx, False)
+        c.derive(idx, False)
+        assert a.serialize(V_XPUB, 0) == b.serialize(V_XPUB, 0) == c.serialize(V_XPUB, 0)
+
+    ek = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
+    n = HDNode()
+    n.deserialize(ek)
+    nn = HDNode().from_chaincode_pubkey(n.chain_code(), n.pubkey())
+    assert nn.serialize(V_XPUB, 0) == ek
+
+    n = HDNode().from_chaincode_pubkey(b"0" * 32, H)
+    assert n.pubkey() == H
+    assert n.chain_code() == b"0" * 32
+
+    try:
+        HDNode().from_chaincode_pubkey(b"\x00" * 32, 32 * b"1")
+        raise RuntimeError("wrong")
+    except ValueError: pass
+
+    try:
+        HDNode().from_chaincode_pubkey(b"\x00" * 33, 32 * b"1")
+        raise RuntimeError("wrong")
+    except ValueError: pass
+
+    # invalid pubkeys (not on curve)
+    invalid_pks = [
+        "026a53cec4dff520329b3edfb8872f61f5fe357c8dd053dd142ea70a505a8461e6",
+        "026a53cec4dff520329b3edfb8872f61f5fe357c8dd053dd142ea70a505a8461e6",
+        "02491c5556030f39912dbb2bdd7a6d5d3f4a7e062bbc7e6282a75e76f538caca2f",
+        "02f278127f798c1bd01ecfc603bdb38ba4ac96e20b52c6d22019189bc7e1d7ac98",
+        "020054974ec994dc1b5cc50d2b7d1b93c3c2bce9e8c756f36c0527de5f99ad2d8b",
+        "02efe143e16a4ca3be7fa7239d487651da71f632c19978e396c1c81b31e351e4e7",
+        "03ee33fdc3b13ae4322274567da0fc406154b3364ed92cd03ecc7704fc2fe5b115",
+        "036b35e6bda7f7cde76318a80d1fbcbd888693e59e5ea70996263291310a01c9a4",
+        "035a3059d0082737101de2c9934de5c11ab8f7f11e872a3b4c735190ac10bbb392",
+        "033ae9d663d06a37ca9871e025a3c012af83da18459573844d90fdd89e749d7c6f",
+        "03464a8effe7ebc779500d024238d5e87418b17a9a911a82c3ad31bd567ba04f47",
+        "03869b5160ba907eef8df50f2041329651617f56dd1f35cf0c8a2a52b8216acfea",
+    ]
+    for ipk in invalid_pks:
+        try:
+            HDNode().from_chaincode_pubkey(b"\x00" * 32, a2b_hex(ipk))
+            raise RuntimeError("wrong")
+        except ValueError:
+            pass
+
+    invalid_sks = [
+        # curve order
+        b"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xba\xae\xdc\xe6\xafH\xa0;\xbf\xd2^\x8c\xd06AA",
+        b"\x00" * 32,  # null
+    ]
+    for isk in invalid_sks:
+        try:
+            HDNode().from_chaincode_privkey(b"\x00" * 32, isk)
+            raise ValueError("wrong")
+        except RuntimeError:
+            # handled in _calc_pubkey -> lottery winner
+            pass
+
+    # compressed vs. uncompressed (same key)
+    a_c = '02a3c7aef15e4f8a546b1eb7d17d956f6e3722bc888b9ec4469878b9a227cc20b7'
+    a_u = '04a3c7aef15e4f8a546b1eb7d17d956f6e3722bc888b9ec4469878b9a227cc20b7683863b6a85f5b494fcc6997b67aaf5ccfb1ca59f1e3e9aab9c5bf00e27bae38'
+    x = HDNode().from_chaincode_pubkey(b"\x00" * 32, a2b_hex(a_c))
+    y = HDNode().from_chaincode_pubkey(b"\x00" * 32, a2b_hex(a_u))
+    assert x.pubkey() == y.pubkey()
+    assert x.serialize(V_XPUB, 0) == y.serialize(V_XPUB, 0)
 
 def test_vectors():
 
@@ -185,7 +261,7 @@ test_b39()
 test_vectors()
 test_derive()
 test_addrs()
-test_misc()
+test_from_chaincode_and_key()
 
 gc.collect()
 

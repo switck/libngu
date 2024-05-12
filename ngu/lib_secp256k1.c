@@ -6,7 +6,7 @@
 /* https://github.com/bitcoin-core/secp256k1/blob/master/CHANGELOG.md#removed */
 
 /* Set ecmult gen precision bits */
-#define ECMULT_GEN_PREC_BITS 2
+#define ECMULT_GEN_KB 2
 
 /* Set window size for ecmult precomputation */
 #define ECMULT_WINDOW_SIZE 2

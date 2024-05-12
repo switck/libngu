@@ -27,7 +27,7 @@ test tests:
 
 # DEVELOPER NOTE
 # adjusting values in secp256k1 configure must match ngu/lib_secp256k1.c (after v0.3.0)
-K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-precision=2 --enable-module-recovery
+K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-kb=2 --enable-module-recovery
 
 .PHONY: one-time
 one-time:

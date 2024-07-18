@@ -106,6 +106,13 @@ void sec_setup_ctx(void)
     // static error callbacks already in place above, no need to setup
 }
 
+STATIC mp_obj_t s_ctx_rnd(void) {
+    sec_setup_ctx();
+    ctx_randomize();
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(s_ctx_rnd_obj, s_ctx_rnd);
+
 // Constructor for signature
 STATIC mp_obj_t s_sig_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
@@ -326,8 +333,6 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter
     uint32_t    nonce_data[8] = { counter, 0, };
     uint8_t     *nonce_ptr = counter ? ((uint8_t *)nonce_data) : NULL;
 
-	ctx_randomize();
-
     int x = secp256k1_ecdsa_sign_recoverable(lib_ctx, &rv->sig, digest.buf, pk,
                                                 secp256k1_nonce_function_default, nonce_ptr);
     if(x != 1) {
@@ -402,8 +407,6 @@ STATIC mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t
 
     vstr_t rv;
     vstr_init_len(&rv, 64);
-
-    ctx_randomize();
 
     int ok;
     if(mp_obj_get_type(privkey_in) == &s_keypair_type) {
@@ -677,6 +680,7 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_sign_schnorr), MP_ROM_PTR(&s_sign_schnorr_obj) },
     { MP_ROM_QSTR(MP_QSTR_verify_schnorr), MP_ROM_PTR(&s_verify_schnorr_obj) },
     { MP_ROM_QSTR(MP_QSTR_tagged_sha256), MP_ROM_PTR(&s_tagged_sha256_obj) },
+    { MP_ROM_QSTR(MP_QSTR_ctx_rnd), MP_ROM_PTR(&s_ctx_rnd_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

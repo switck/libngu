@@ -705,7 +705,7 @@ STATIC mp_obj_t s_musig_pubkey_agg(size_t n_args, const mp_obj_t *pos_args, mp_m
 
     int ok;
     // default is to sort the pubkeys - so aggregate key is always the same from same set of keys regardless of order
-    bool sort_pubkeys = (args[2].u_obj == mp_const_true);
+    bool sort_pubkeys = mp_obj_is_true(args[2].u_obj);
     if (sort_pubkeys){
         ok = secp256k1_ec_pubkey_sort(secp256k1_context_static, pks, len_pubkeys);
         if (!ok){
@@ -886,10 +886,10 @@ STATIC mp_obj_t s_musig_nonce_gen(size_t n_args, const mp_obj_t *pos_args, mp_ma
     }
 
 	// new nonce produced by this function
-	// musig pubnonce
+	// musig secnonce
 	mp_obj_musig_secnonce_t *sn = m_new_obj(mp_obj_musig_secnonce_t);
 	sn->base.type = &s_musig_secnonce_type;
-	// musig secnonce
+	// musig pubnonce
 	mp_obj_musig_pubnonce_t *pn = m_new_obj(mp_obj_musig_pubnonce_t);
     pn->base.type = &s_musig_pubnonce_type;
 

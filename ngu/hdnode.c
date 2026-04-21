@@ -145,7 +145,7 @@ mp_obj_t hdnode_deserialize_bytes(mp_obj_hdnode_t *self, uint8_t *p) {
         /* verify that parsed pubkey is valid */
         secp256k1_pubkey pub;
         int ok;
-        ok = secp256k1_ec_pubkey_parse(lib_ctx, &pub, self->pubkey, 33);
+        ok = secp256k1_ec_pubkey_parse(secp256k1_context_static, &pub, self->pubkey, 33);
         if(!ok) goto fail;
 
     } else {

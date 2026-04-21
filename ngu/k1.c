@@ -416,7 +416,7 @@ STATIC mp_obj_t s_verify_schnorr(mp_obj_t compact_sig_in, mp_obj_t digest_in, mp
     }
 
     mp_obj_xonly_pubkey_t *xonly_pub = MP_OBJ_TO_PTR(xonly_pubkey_in);
-    int ok = secp256k1_schnorrsig_verify(lib_ctx, compact_sig.buf, digest.buf, digest.len, &xonly_pub->pubkey);
+    int ok = secp256k1_schnorrsig_verify(secp256k1_context_static, compact_sig.buf, digest.buf, digest.len, &xonly_pub->pubkey);
     if (ok != 1) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_schnorrsig_verify"));
     }

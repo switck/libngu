@@ -69,6 +69,35 @@ sig3 = ngu.secp256k1.signature(sig2.to_bytes()[:-1] + b'\0')
 pubkey3 = sig3.verify_recover(md)
 assert pubkey3 != pubkey
 
+try:
+    # privkey length
+    ngu.secp256k1.sign(bytes(26), md, 0)
+    assert False
+except ValueError as e:
+    assert "privkey len != 32" in str(e)
+
+try:
+    # privkey length
+    ngu.secp256k1.sign(pk, bytes(40), 0)
+    assert False
+except ValueError as e:
+    assert "md len != 32" in str(e)
+
+try:
+    # privkey is zero
+    ngu.secp256k1.sign(bytes(32), md, 0)
+    assert False
+except ValueError as e:
+    assert "secp256k1_ecdsa_sign_recoverable" in str(e)
+
+try:
+    # privkey is secp256k1 curve order (n)
+    n = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xba\xae\xdc\xe6\xaf\x48\xa0\x3b\xbf\xd2\x5e\x8c\xd0\x36\x41\x41'
+    ngu.secp256k1.sign(n, md, 0)
+    assert False
+except ValueError as e:
+    assert "secp256k1_ecdsa_sign_recoverable" in str(e)
+
 # keypair tweaking
 kp = ngu.secp256k1.keypair()
 tweak32 = ngu.random.bytes(32)

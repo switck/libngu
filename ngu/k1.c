@@ -390,9 +390,9 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter
     int x = secp256k1_ecdsa_sign_recoverable(lib_ctx, &rv->sig, digest.buf, pk,
                                                 secp256k1_nonce_function_default, nonce_ptr);
     if(x != 1) {
-        mp_raise_ValueError(MP_ERROR_TEXT("verify/recover sig"));
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ecdsa_sign_recoverable"));
     }
-    
+
     return MP_OBJ_FROM_PTR(rv);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_obj, s_sign);

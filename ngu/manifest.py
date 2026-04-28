@@ -3,15 +3,16 @@ freeze_as_mpy('', [
 ], opt=3)
 
 import os
-if not os.environ.get('EXCLUDE_NGU_TESTS', False):
+if not int(os.environ.get('EXCLUDE_NGU_TESTS', 0)):
     print("NGU: including tests")
     freeze_as_mpy('', [
         "ngu_tests/run.py",
         "ngu_tests/b39_data.py",
         "ngu_tests/b39_vectors.py",
         "ngu_tests/b340_vectors.py",
-        "ngu_tests/test_bip39.py",
         "ngu_tests/test_aes_gen.py",
+        "ngu_tests/test_bip32.py",
+        "ngu_tests/test_bip39.py",
         "ngu_tests/test_cert.py",
         "ngu_tests/test_codecs_gen.py",
         "ngu_tests/test_ec.py",

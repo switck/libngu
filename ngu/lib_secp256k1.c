@@ -1,12 +1,15 @@
 #ifndef NO_QSTR
 
 /* DEVELOPER NOTE */
-/* This MUST match what is passed to configure in Makefile via K1_CONF_FLAGS */
-/* This is a reaction to v0.3.0 and removal of configuration header */
-/* https://github.com/bitcoin-core/secp256k1/blob/master/CHANGELOG.md#removed */
+/* Since v0.3.0 secp256k1 dropped its generated config header, so the amalgamation
+   build below (#include "src/secp256k1.c") never sees the -D defines that
+   ./configure would normally pass. The table-size knobs MUST therefore be set
+   here, and kept in sync with K1_CONF_FLAGS in the Makefile (used only to
+   regenerate the precomputed_ecmult*.c tables via `make precomp`).
+   https://github.com/bitcoin-core/secp256k1/blob/master/CHANGELOG.md#removed */
 
-/* Set ecmult gen precision bits */
-#define ECMULT_GEN_KB 2
+#define COMB_BLOCKS 11
+#define COMB_TEETH 6
 
 /* Set window size for ecmult precomputation */
 #define ECMULT_WINDOW_SIZE 2

@@ -29,8 +29,11 @@ test tests:
 	(cd ngu/ngu_tests; make tests)
 
 # DEVELOPER NOTE
-# adjusting values in secp256k1 configure must match ngu/lib_secp256k1.c (after v0.3.0)
-K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-kb=2 --enable-module-recovery
+# These must match the table-size #defines in ngu/lib_secp256k1.c (after v0.3.0 the
+# amalgamation build is driven by those defines, NOT by these flags; these only control
+# `make precomp` table regeneration). gen-kb=22: secp256k1 default & fastest signing
+# point (== COMB_BLOCKS=11/COMB_TEETH=6).
+K1_CONF_FLAGS = --with-ecmult-window=2 --with-ecmult-gen-kb=22 --enable-module-recovery
 
 .PHONY: one-time
 one-time:

@@ -16,6 +16,9 @@
 
 #include "sec_shared.h"
 
+// NGU_INCL_SCHNORR / NGU_INCL_MUSIG are set by the build (ngu/micropython.mk),
+// default off. They gate the optional BIP340 Schnorr and MuSig2 bindings below.
+
 #if MICROPY_SSL_MBEDTLS
 #include "mbedtls/sha256.h"
 #else
@@ -43,6 +46,7 @@ typedef struct  {
     secp256k1_keypair   keypair;
 } mp_obj_keypair_t;
 
+#if NGU_INCL_MUSIG
 // MuSig2 types
 typedef struct {
     mp_obj_base_t base;
@@ -73,18 +77,21 @@ typedef struct {
     mp_obj_base_t base;
     secp256k1_musig_partial_sig sig;
 } mp_obj_musig_partial_sig_t;
+#endif // NGU_INCL_MUSIG
 
 
 STATIC const mp_obj_type_t s_pubkey_type;
 STATIC const mp_obj_type_t s_xonly_pubkey_type;
 STATIC const mp_obj_type_t s_sig_type;
 STATIC const mp_obj_type_t s_keypair_type;
+#if NGU_INCL_MUSIG
 STATIC const mp_obj_type_t s_musig_pubnonce_type;
 STATIC const mp_obj_type_t s_musig_secnonce_type;
 STATIC const mp_obj_type_t s_musig_aggnonce_type;
 STATIC const mp_obj_type_t s_musig_keyagg_cache_type;
 STATIC const mp_obj_type_t s_musig_session_type;
 STATIC const mp_obj_type_t s_musig_partial_sig_type;
+#endif // NGU_INCL_MUSIG
 
 // Shared context for all major ops.
 secp256k1_context   *lib_ctx;
@@ -398,6 +405,7 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_obj, s_sign);
 
 
+#if NGU_INCL_SCHNORR
 STATIC mp_obj_t s_verify_schnorr(mp_obj_t compact_sig_in, mp_obj_t digest_in, mp_obj_t xonly_pubkey_in) {
     mp_buffer_info_t compact_sig;
     mp_get_buffer_raise(compact_sig_in, &compact_sig, MP_BUFFER_READ);
@@ -469,6 +477,7 @@ STATIC mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_schnorr_obj, s_sign_schnorr);
+#endif // NGU_INCL_SCHNORR
 
 // KEY PAIRS (private key, with public key computed)
 
@@ -649,6 +658,7 @@ STATIC mp_obj_t s_keypair_ecdh_multiply(mp_obj_t self_in, mp_obj_t other_point_i
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_ecdh_multiply_obj, s_keypair_ecdh_multiply);
 
 
+#if NGU_INCL_MUSIG
 // MuSig2
 
 STATIC mp_obj_t s_musig_keyagg_cache_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -1199,6 +1209,7 @@ STATIC mp_obj_t s_musig_partial_sig_agg(mp_obj_t part_sigs_in, mp_obj_t session_
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &res);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_musig_partial_sig_agg_obj, s_musig_partial_sig_agg);
+#endif // NGU_INCL_MUSIG
 
 
 // sigs and what you can do with them
@@ -1213,20 +1224,6 @@ STATIC const mp_obj_type_t s_sig_type = {
     .name = MP_QSTR_secp256k1_sig,
     .make_new = s_sig_make_new,
     .locals_dict = (void *)&s_sig_locals_dict,
-};
-
-// musig partial signature
-STATIC const mp_rom_map_elem_t s_musig_partial_sig_locals_dict_table[] = {
-    { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_musig_partial_sig_to_bytes_obj) },
-    { MP_ROM_QSTR(MP_QSTR_verify), MP_ROM_PTR(&s_musig_partial_sig_verify_obj) },
-};
-STATIC MP_DEFINE_CONST_DICT(s_musig_partial_sig_locals_dict, s_musig_partial_sig_locals_dict_table);
-
-STATIC const mp_obj_type_t s_musig_partial_sig_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_musig_partial_sig,
-    .make_new = s_musig_partial_sig_make_new,
-    .locals_dict = (void *)&s_musig_partial_sig_locals_dict,
 };
 
 // pubkeys and what you can do with them
@@ -1255,6 +1252,21 @@ STATIC const mp_obj_type_t s_xonly_pubkey_type = {
     .name = MP_QSTR_secp256k1_xonly_pubkey,
     .make_new = s_xonly_pubkey_make_new,
     .locals_dict = (void *)&s_xonly_pubkey_locals_dict,
+};
+
+#if NGU_INCL_MUSIG
+// musig partial signature
+STATIC const mp_rom_map_elem_t s_musig_partial_sig_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_musig_partial_sig_to_bytes_obj) },
+    { MP_ROM_QSTR(MP_QSTR_verify), MP_ROM_PTR(&s_musig_partial_sig_verify_obj) },
+};
+STATIC MP_DEFINE_CONST_DICT(s_musig_partial_sig_locals_dict, s_musig_partial_sig_locals_dict_table);
+
+STATIC const mp_obj_type_t s_musig_partial_sig_type = {
+    { &mp_type_type },
+    .name = MP_QSTR_secp256k1_musig_partial_sig,
+    .make_new = s_musig_partial_sig_make_new,
+    .locals_dict = (void *)&s_musig_partial_sig_locals_dict,
 };
 
 // musig opaque
@@ -1304,6 +1316,7 @@ STATIC const mp_obj_type_t s_musig_secnonce_type = {
     { &mp_type_type },
     .name = MP_QSTR_secp256k1_musig_secnonce,
 };
+#endif // NGU_INCL_MUSIG
 
 // privkeys and what you can do with them
 STATIC const mp_rom_map_elem_t s_keypair_locals_dict_table[] = {
@@ -1331,10 +1344,13 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_keypair), MP_ROM_PTR(&s_keypair_type) },
     { MP_ROM_QSTR(MP_QSTR_signature), MP_ROM_PTR(&s_sig_type) },
     { MP_ROM_QSTR(MP_QSTR_sign), MP_ROM_PTR(&s_sign_obj) },
+#if NGU_INCL_SCHNORR
     { MP_ROM_QSTR(MP_QSTR_sign_schnorr), MP_ROM_PTR(&s_sign_schnorr_obj) },
     { MP_ROM_QSTR(MP_QSTR_verify_schnorr), MP_ROM_PTR(&s_verify_schnorr_obj) },
+#endif
     { MP_ROM_QSTR(MP_QSTR_ctx_rnd), MP_ROM_PTR(&s_ctx_rnd_obj) },
 
+#if NGU_INCL_MUSIG
     { MP_ROM_QSTR(MP_QSTR_MusigKeyAggCache), MP_ROM_PTR(&s_musig_keyagg_cache_type) },
     { MP_ROM_QSTR(MP_QSTR_musig_nonce_gen), MP_ROM_PTR(&s_musig_nonce_gen_obj) },
     { MP_ROM_QSTR(MP_QSTR_MusigPubNonce), MP_ROM_PTR(&s_musig_pubnonce_type) },
@@ -1347,6 +1363,7 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_musig_nonce_process), MP_ROM_PTR(&s_musig_nonce_process_obj) },
     { MP_ROM_QSTR(MP_QSTR_musig_partial_sign), MP_ROM_PTR(&s_musig_partial_sign_obj) },
     { MP_ROM_QSTR(MP_QSTR_musig_partial_sig_agg), MP_ROM_PTR(&s_musig_partial_sig_agg_obj) },
+#endif // NGU_INCL_MUSIG
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);
@@ -1355,4 +1372,3 @@ const mp_obj_module_t mp_module_secp256k1 = {
     .base = { &mp_type_module },
     .globals = (mp_obj_dict_t *)&globals_table_obj,
 };
-

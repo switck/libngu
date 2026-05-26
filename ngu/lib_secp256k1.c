@@ -16,6 +16,10 @@
    8 == ~29% faster public derivation than 2, for +8KB flash */
 #define ECMULT_WINDOW_SIZE 8
 
+/* NGU_INCL_SCHNORR / NGU_INCL_MUSIG are set by the build (ngu/micropython.mk),
+   default off; they gate the optional schnorrsig / musig modules below. */
+
+/* Always built: cheap, and the keypair/xonly types are broadly useful. */
 /* Define this symbol to enable the ECDH module */
 #define ENABLE_MODULE_ECDH 1
 
@@ -25,11 +29,16 @@
 /* Define this symbol to enable the ECDSA pubkey recovery module */
 #define ENABLE_MODULE_RECOVERY 1
 
+/* Optional: BIP340 Schnorr (and, transitively, MuSig2). */
 /* Define this symbol to enable the schnorrsig module */
+#if NGU_INCL_SCHNORR
 #define ENABLE_MODULE_SCHNORRSIG 1
+#endif
 
 /* Define this symbol to enable the musig module */
+#if NGU_INCL_MUSIG
 #define ENABLE_MODULE_MUSIG 1
+#endif
 
 #define USE_EXTERNAL_DEFAULT_CALLBACKS
 

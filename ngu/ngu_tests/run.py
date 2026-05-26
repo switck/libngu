@@ -19,6 +19,8 @@ import ngu_tests.test_hdnode
 import ngu_tests.test_hdnode_gen
 import ngu_tests.test_k1
 import ngu_tests.test_k1_gen
+import ngu_tests.test_schnorr
+import ngu_tests.test_musig
 if hasattr(ngu, 'ec'):
     import ngu_tests.test_ec
     import ngu_tests.test_ec_gen

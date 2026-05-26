@@ -7,7 +7,23 @@ MY_FILES = hash.c modngu.c ec.c cert.c k1.c random.c base32.c codecs.c hm.c \
 			rmd160.c aes.c lib_segwit.c
 
 CFLAGS_USERMOD += -I$(NGU_TOP_DIR)/ngu -I$(NGU_TOP_DIR)/libs
- 
+
+# Optional secp256k1 features: BIP340 Schnorr and MuSig2. Both default OFF.
+# Opt in from the build, e.g.:
+#     make ... NGU_INCL_SCHNORR=1  # Schnorr only
+#     make ... NGU_INCL_MUSIG=1    # Schnorr and MuSig2
+# extrakeys / ecdh / recovery are always compiled in.
+NGU_INCL_MUSIG   ?= 0
+NGU_INCL_SCHNORR ?= $(NGU_INCL_MUSIG)
+# MuSig2 requires Schnorr. Enabling MuSig2 therefore enables Schnorr unless the
+# build explicitly requests the contradictory combination, which is an error.
+ifeq ($(NGU_INCL_MUSIG),1)
+ifeq ($(NGU_INCL_SCHNORR),0)
+$(error NGU_INCL_MUSIG=1 requires NGU_INCL_SCHNORR=1)
+endif
+endif
+CFLAGS_USERMOD += -DNGU_INCL_SCHNORR=$(NGU_INCL_SCHNORR) -DNGU_INCL_MUSIG=$(NGU_INCL_MUSIG)
+
 FROZEN_MANIFEST += $(NGU_TOP_DIR)/ngu/manifest.py
 
 %/lib_secp256k1.o: \

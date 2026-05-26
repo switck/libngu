@@ -18,6 +18,8 @@ test tests:
 	$(PY) test_k1.py
 	$(MPY) test_k1.py
 	$(MPY) test_k1_gen.py
+	$(MPY) test_schnorr.py
+	$(MPY) test_musig.py
 	$(PY) test_hmac.py
 	$(MPY) test_cert.py
 	$(PY) test_ec.py

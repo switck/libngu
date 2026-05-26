@@ -24,5 +24,7 @@ if not int(os.environ.get('EXCLUDE_NGU_TESTS', 0)):
         "ngu_tests/test_hmac.py",
         "ngu_tests/test_k1.py",
         "ngu_tests/test_k1_gen.py",
+        "ngu_tests/test_schnorr.py",
+        "ngu_tests/test_musig.py",
         "ngu_tests/test_random.py",
     ], opt=0)       # need zero-optimization so asserts are included

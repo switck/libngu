@@ -36,7 +36,7 @@ $(BUILD)/hack_lib_cifra.o:
 	@echo HACKING target: $@
 	$(RM) -f $(CIFRA_OBJS)
 	(cd $(NGU_TOP_DIR)/libs/cifra/src; $(MAKE) CC=$(CC) CFLAGS="$(CIFRA_CFLAGS)" $(CIFRA_PARTS))
-	$(CC) -r -o $@ $(CIFRA_CFLAGS) $(CIFRA_OBJS)
+	$(CC) -r -nostdlib -o $@ $(CIFRA_CFLAGS) $(CIFRA_OBJS)
 
 PY_O += $(BUILD)/hack_lib_cifra.o
 

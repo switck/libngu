@@ -17,7 +17,7 @@
 // 
 // Base 32
 // 
-STATIC mp_obj_t c_b32decode(mp_obj_t arg_in)
+static mp_obj_t c_b32decode(mp_obj_t arg_in)
 {
     const char *arg = mp_obj_str_get_str(arg_in);
     uint8_t tmp[strlen(arg)+10];
@@ -29,10 +29,10 @@ STATIC mp_obj_t c_b32decode(mp_obj_t arg_in)
 
     return mp_obj_new_bytes(tmp, len_out);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b32decode_obj, c_b32decode);
+static MP_DEFINE_CONST_FUN_OBJ_1(c_b32decode_obj, c_b32decode);
 
 
-STATIC mp_obj_t c_b32encode(mp_obj_t arg_in) {
+static mp_obj_t c_b32encode(mp_obj_t arg_in) {
     mp_buffer_info_t buf;
     mp_get_buffer_raise(arg_in, &buf, MP_BUFFER_READ);
 
@@ -45,7 +45,7 @@ STATIC mp_obj_t c_b32encode(mp_obj_t arg_in) {
 
     return mp_obj_new_str((char *)tmp, len_out);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b32encode_obj, c_b32encode);
+static MP_DEFINE_CONST_FUN_OBJ_1(c_b32encode_obj, c_b32encode);
 
 // 
 // Base 58 - always with checksum, never with a particular prefix
@@ -59,7 +59,7 @@ bool b58_sha256_impl(void *out, const void *inp, int len)
     return true;
 }
 
-STATIC mp_obj_t c_b58decode(mp_obj_t arg_in)
+static mp_obj_t c_b58decode(mp_obj_t arg_in)
 {
     uint8_t tmp[128];
 
@@ -70,10 +70,10 @@ STATIC mp_obj_t c_b58decode(mp_obj_t arg_in)
 
     return mp_obj_new_bytes(tmp, len_out);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b58decode_obj, c_b58decode);
+static MP_DEFINE_CONST_FUN_OBJ_1(c_b58decode_obj, c_b58decode);
 
 
-STATIC mp_obj_t c_b58encode(mp_obj_t arg_in)
+static mp_obj_t c_b58encode(mp_obj_t arg_in)
 {
     mp_buffer_info_t buf;
     mp_get_buffer_raise(arg_in, &buf, MP_BUFFER_READ);
@@ -87,11 +87,11 @@ STATIC mp_obj_t c_b58encode(mp_obj_t arg_in)
 
     return mp_obj_new_str(tmp, len_out-1);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_b58encode_obj, c_b58encode);
+static MP_DEFINE_CONST_FUN_OBJ_1(c_b58encode_obj, c_b58encode);
 
 // Segwit = BECH32(m)
 
-STATIC mp_obj_t c_segwit_encode(mp_obj_t hrp_in, mp_obj_t witver_in, mp_obj_t prog_in)
+static mp_obj_t c_segwit_encode(mp_obj_t hrp_in, mp_obj_t witver_in, mp_obj_t prog_in)
 {
     const char *hrp = mp_obj_str_get_str(hrp_in);
     int witver = mp_obj_get_int_truncated(witver_in);
@@ -109,10 +109,10 @@ STATIC mp_obj_t c_segwit_encode(mp_obj_t hrp_in, mp_obj_t witver_in, mp_obj_t pr
 
     return mp_obj_new_str(tmp, strlen(tmp));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(c_segwit_encode_obj, c_segwit_encode);
+static MP_DEFINE_CONST_FUN_OBJ_3(c_segwit_encode_obj, c_segwit_encode);
 
 
-STATIC mp_obj_t c_segwit_decode(mp_obj_t addr_in)
+static mp_obj_t c_segwit_decode(mp_obj_t addr_in)
 {
     const char *addr = mp_obj_str_get_str(addr_in);
 
@@ -134,11 +134,11 @@ STATIC mp_obj_t c_segwit_decode(mp_obj_t addr_in)
 
     return mp_obj_new_tuple(3, rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_segwit_decode_obj, c_segwit_decode);
+static MP_DEFINE_CONST_FUN_OBJ_1(c_segwit_decode_obj, c_segwit_decode);
 
 // BECH32
 
-STATIC mp_obj_t c_nip19_encode(mp_obj_t hrp_in, mp_obj_t prog_in)
+static mp_obj_t c_nip19_encode(mp_obj_t hrp_in, mp_obj_t prog_in)
 {
     const char *hrp = mp_obj_str_get_str(hrp_in);
 
@@ -161,10 +161,10 @@ STATIC mp_obj_t c_nip19_encode(mp_obj_t hrp_in, mp_obj_t prog_in)
 
     return mp_obj_new_str(tmp, strlen(tmp));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(c_nip19_encode_obj, c_nip19_encode);
+static MP_DEFINE_CONST_FUN_OBJ_2(c_nip19_encode_obj, c_nip19_encode);
 
 
-STATIC mp_obj_t c_nip19_decode(mp_obj_t str_in)
+static mp_obj_t c_nip19_decode(mp_obj_t str_in)
 {
     const char *str = mp_obj_str_get_str(str_in);
 
@@ -184,10 +184,10 @@ STATIC mp_obj_t c_nip19_decode(mp_obj_t str_in)
     convert_bits(res, &reslen, 8, data, data_len, 5, 0);
     return mp_obj_new_bytes(res, reslen);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_nip19_decode_obj, c_nip19_decode);
+static MP_DEFINE_CONST_FUN_OBJ_1(c_nip19_decode_obj, c_nip19_decode);
 
 
-STATIC const mp_rom_map_elem_t globals_table[] = {
+static const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_codecs) },
 
     { MP_ROM_QSTR(MP_QSTR_b32_encode), MP_ROM_PTR(&c_b32encode_obj) },
@@ -203,7 +203,7 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_nip19_decode), MP_ROM_PTR(&c_nip19_decode_obj) },
 };
 
-STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);
+static MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);
 
 const mp_obj_module_t mp_module_codecs = {
     .base = { &mp_type_module },

@@ -7,6 +7,7 @@
 // - see test_k1.py
 //
 #include "py/runtime.h"
+#include "py/objmodule.h"  // needed for mp_obj_module_get_globals
 #include "py/objlist.h" // For list-related functions
 #include "random.h"
 #include <string.h>
@@ -19,7 +20,7 @@
 #if MICROPY_SSL_MBEDTLS
 #include "mbedtls/sha256.h"
 #else
-#include "extmod/crypto-algorithms/sha256.h"
+#include "lib/crypto-algorithms/sha256.h"
 #endif
 
 typedef struct  {
@@ -75,16 +76,16 @@ typedef struct {
 } mp_obj_musig_partial_sig_t;
 
 
-STATIC const mp_obj_type_t s_pubkey_type;
-STATIC const mp_obj_type_t s_xonly_pubkey_type;
-STATIC const mp_obj_type_t s_sig_type;
-STATIC const mp_obj_type_t s_keypair_type;
-STATIC const mp_obj_type_t s_musig_pubnonce_type;
-STATIC const mp_obj_type_t s_musig_secnonce_type;
-STATIC const mp_obj_type_t s_musig_aggnonce_type;
-STATIC const mp_obj_type_t s_musig_keyagg_cache_type;
-STATIC const mp_obj_type_t s_musig_session_type;
-STATIC const mp_obj_type_t s_musig_partial_sig_type;
+static const mp_obj_type_t s_pubkey_type;
+static const mp_obj_type_t s_xonly_pubkey_type;
+static const mp_obj_type_t s_sig_type;
+static const mp_obj_type_t s_keypair_type;
+static const mp_obj_type_t s_musig_pubnonce_type;
+static const mp_obj_type_t s_musig_secnonce_type;
+static const mp_obj_type_t s_musig_aggnonce_type;
+static const mp_obj_type_t s_musig_keyagg_cache_type;
+static const mp_obj_type_t s_musig_session_type;
+static const mp_obj_type_t s_musig_partial_sig_type;
 
 // Shared context for all major ops.
 secp256k1_context   *lib_ctx;
@@ -144,15 +145,15 @@ void sec_setup_ctx(void)
     // static error callbacks already in place above, no need to setup
 }
 
-STATIC mp_obj_t s_ctx_rnd(void) {
+static mp_obj_t s_ctx_rnd(void) {
     sec_setup_ctx();
     ctx_randomize();
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(s_ctx_rnd_obj, s_ctx_rnd);
+static MP_DEFINE_CONST_FUN_OBJ_0(s_ctx_rnd_obj, s_ctx_rnd);
 
 // Constructor for signature
-STATIC mp_obj_t s_sig_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_sig_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
 
     mp_obj_sig_t *o = m_new_obj(mp_obj_sig_t);
@@ -184,7 +185,7 @@ STATIC mp_obj_t s_sig_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
 
 
 // Constructor for pubkey
-STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
 
     mp_obj_pubkey_t *o = m_new_obj(mp_obj_pubkey_t);
@@ -203,7 +204,7 @@ STATIC mp_obj_t s_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size
 }
 
 // Constructor for xonly pubkey
-STATIC mp_obj_t s_xonly_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_xonly_pubkey_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
 
     mp_obj_xonly_pubkey_t *o = m_new_obj(mp_obj_xonly_pubkey_t);
@@ -224,11 +225,11 @@ STATIC mp_obj_t s_xonly_pubkey_make_new(const mp_obj_type_t *type, size_t n_args
 }
 
 // output pubkey
-STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
+static mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     mp_obj_pubkey_t *self = MP_OBJ_TO_PTR(args[0]);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 66);
+    size_t outlen = 66;
+    uint8_t res[outlen];
 
     // default: compressed, but can pass in true to get uncompressed
     bool compressed = true;
@@ -236,18 +237,16 @@ STATIC mp_obj_t s_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
         compressed = !mp_obj_is_true(args[1]);
     }
 
-    size_t outlen = vstr.len;
-    secp256k1_ec_pubkey_serialize(secp256k1_context_static, (uint8_t *)vstr.buf, &outlen,
+    secp256k1_ec_pubkey_serialize(secp256k1_context_static, res, &outlen,
             &self->pubkey,
             compressed ? SECP256K1_EC_COMPRESSED: SECP256K1_EC_UNCOMPRESSED );
 
-    vstr.len = outlen;
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(res, outlen);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_pubkey_to_bytes_obj, 1, 2, s_pubkey_to_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_pubkey_to_bytes_obj, 1, 2, s_pubkey_to_bytes);
 
 
-STATIC mp_obj_t s_pubkey_to_xonly(mp_obj_t self_in){
+static mp_obj_t s_pubkey_to_xonly(mp_obj_t self_in){
     mp_obj_pubkey_t *self = MP_OBJ_TO_PTR(self_in);
 
     mp_obj_xonly_pubkey_t *xonly = m_new_obj(mp_obj_xonly_pubkey_t);
@@ -259,31 +258,30 @@ STATIC mp_obj_t s_pubkey_to_xonly(mp_obj_t self_in){
     }
     return MP_OBJ_FROM_PTR(xonly);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_pubkey_to_xonly_obj, s_pubkey_to_xonly);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_pubkey_to_xonly_obj, s_pubkey_to_xonly);
 
 
 // output xonly pubkey
-STATIC mp_obj_t s_xonly_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
+static mp_obj_t s_xonly_pubkey_to_bytes(size_t n_args, const mp_obj_t *args) {
     mp_obj_xonly_pubkey_t *self = MP_OBJ_TO_PTR(args[0]);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 32);
+    uint8_t res[32];
 
-    secp256k1_xonly_pubkey_serialize(secp256k1_context_static, (uint8_t *)vstr.buf, &self->pubkey);
+    secp256k1_xonly_pubkey_serialize(secp256k1_context_static, res, &self->pubkey);
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(res, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_xonly_pubkey_to_bytes_obj, 1, 2, s_xonly_pubkey_to_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_xonly_pubkey_to_bytes_obj, 1, 2, s_xonly_pubkey_to_bytes);
 
 // output xonly pubkey parity
-STATIC mp_obj_t s_xonly_pubkey_parity(mp_obj_t self_in) {
+static mp_obj_t s_xonly_pubkey_parity(mp_obj_t self_in) {
     mp_obj_xonly_pubkey_t *self = MP_OBJ_TO_PTR(self_in);
     return mp_obj_new_int(self->parity);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_xonly_pubkey_parity_obj, s_xonly_pubkey_parity);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_xonly_pubkey_parity_obj, s_xonly_pubkey_parity);
 
 // add tweak32 to xonly pubkey
-STATIC mp_obj_t s_xonly_pubkey_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in) {
+static mp_obj_t s_xonly_pubkey_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in) {
     int rc;
     mp_buffer_info_t tweak32;
     mp_get_buffer_raise(tweak32_in, &tweak32, MP_BUFFER_READ);
@@ -307,29 +305,28 @@ STATIC mp_obj_t s_xonly_pubkey_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in) 
     return MP_OBJ_FROM_PTR(rv);
 
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_xonly_pubkey_tweak_add_obj, s_xonly_pubkey_tweak_add);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_xonly_pubkey_tweak_add_obj, s_xonly_pubkey_tweak_add);
 
 // output signature as 65 bytes
-STATIC mp_obj_t s_sig_to_bytes(mp_obj_t self_in) {
+static mp_obj_t s_sig_to_bytes(mp_obj_t self_in) {
     mp_obj_sig_t *self = MP_OBJ_TO_PTR(self_in);
 
     int recid = 0;
-    vstr_t vstr;
-    vstr_init_len(&vstr, 65);
 
-    secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_context_static,
-                ((uint8_t *)vstr.buf)+1, &recid, &self->sig);
+    uint8_t res[65];
+
+    secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_context_static, res+1, &recid, &self->sig);
 
     // first byte is bitcoin-specific rec id
     // - always compressed
-    vstr.buf[0] = 27 + recid + 4;
+    res[0] = 27 + recid + 4;
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(res, 65);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_sig_to_bytes_obj, s_sig_to_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_sig_to_bytes_obj, s_sig_to_bytes);
 
 // verify sig (and recovery pubkey)
-STATIC mp_obj_t s_sig_verify_recover(mp_obj_t self_in, mp_obj_t digest_in)
+static mp_obj_t s_sig_verify_recover(mp_obj_t self_in, mp_obj_t digest_in)
 {
     mp_obj_sig_t *self = MP_OBJ_TO_PTR(self_in);
 
@@ -350,10 +347,10 @@ STATIC mp_obj_t s_sig_verify_recover(mp_obj_t self_in, mp_obj_t digest_in)
     
     return MP_OBJ_FROM_PTR(rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_sig_verify_recover_obj, s_sig_verify_recover);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_sig_verify_recover_obj, s_sig_verify_recover);
 
 
-STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter_in)
+static mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter_in)
 {
     sec_setup_ctx();
 
@@ -395,10 +392,10 @@ STATIC mp_obj_t s_sign(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t counter
 
     return MP_OBJ_FROM_PTR(rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_obj, s_sign);
+static MP_DEFINE_CONST_FUN_OBJ_3(s_sign_obj, s_sign);
 
 
-STATIC mp_obj_t s_verify_schnorr(mp_obj_t compact_sig_in, mp_obj_t digest_in, mp_obj_t xonly_pubkey_in) {
+static mp_obj_t s_verify_schnorr(mp_obj_t compact_sig_in, mp_obj_t digest_in, mp_obj_t xonly_pubkey_in) {
     mp_buffer_info_t compact_sig;
     mp_get_buffer_raise(compact_sig_in, &compact_sig, MP_BUFFER_READ);
     if(compact_sig.len != 64) {
@@ -422,10 +419,10 @@ STATIC mp_obj_t s_verify_schnorr(mp_obj_t compact_sig_in, mp_obj_t digest_in, mp
     }
     return mp_obj_new_int(ok);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_verify_schnorr_obj, s_verify_schnorr);
+static MP_DEFINE_CONST_FUN_OBJ_3(s_verify_schnorr_obj, s_verify_schnorr);
 
 
-STATIC mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t aux_rand_in)
+static mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t aux_rand_in)
 {
     sec_setup_ctx();
 
@@ -440,13 +437,12 @@ STATIC mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t
         mp_raise_ValueError(MP_ERROR_TEXT("aux rand len != 32"));
     }
 
-    vstr_t rv;
-    vstr_init_len(&rv, 64);
+    uint8_t rv[64];
 
     int ok;
     if(mp_obj_get_type(privkey_in) == &s_keypair_type) {
     	mp_obj_keypair_t *keypair = MP_OBJ_TO_PTR(privkey_in);
-        ok = secp256k1_schnorrsig_sign32(lib_ctx, (uint8_t *)rv.buf, digest.buf, &keypair->keypair, aux_rand.buf);
+        ok = secp256k1_schnorrsig_sign32(lib_ctx, rv, digest.buf, &keypair->keypair, aux_rand.buf);
     } else {
         // typical: raw privkey
         mp_buffer_info_t privkey;
@@ -460,20 +456,20 @@ STATIC mp_obj_t s_sign_schnorr(mp_obj_t privkey_in, mp_obj_t digest_in, mp_obj_t
 		if (!key_ok) {
 			mp_raise_ValueError(MP_ERROR_TEXT("invalid secret"));
 		}
-        ok = secp256k1_schnorrsig_sign32(lib_ctx, (uint8_t *)rv.buf, digest.buf, &keypair, aux_rand.buf);
+        ok = secp256k1_schnorrsig_sign32(lib_ctx, rv, digest.buf, &keypair, aux_rand.buf);
     }
     if(!ok) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_schnorrsig_sign"));
     }
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
+    return mp_obj_new_bytes(rv, 64);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_sign_schnorr_obj, s_sign_schnorr);
+static MP_DEFINE_CONST_FUN_OBJ_3(s_sign_schnorr_obj, s_sign_schnorr);
 
 // KEY PAIRS (private key, with public key computed)
 
 // Constructor for keypair
-STATIC mp_obj_t s_keypair_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_keypair_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
 
     mp_obj_keypair_t *o = m_new_obj(mp_obj_keypair_t);
@@ -513,7 +509,7 @@ STATIC mp_obj_t s_keypair_make_new(const mp_obj_type_t *type, size_t n_args, siz
 
 // keypair METHODS
 
-STATIC mp_obj_t s_keypair_privkey(mp_obj_t self_in) {
+static mp_obj_t s_keypair_privkey(mp_obj_t self_in) {
     mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
 
     uint8_t seckey[32];
@@ -521,9 +517,9 @@ STATIC mp_obj_t s_keypair_privkey(mp_obj_t self_in) {
 
     return mp_obj_new_bytes(seckey, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_privkey_obj, s_keypair_privkey);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_privkey_obj, s_keypair_privkey);
 
-STATIC mp_obj_t s_keypair_pubkey(mp_obj_t self_in) {
+static mp_obj_t s_keypair_pubkey(mp_obj_t self_in) {
     mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
 
     sec_setup_ctx();
@@ -539,9 +535,9 @@ STATIC mp_obj_t s_keypair_pubkey(mp_obj_t self_in) {
 
     return MP_OBJ_FROM_PTR(rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_pubkey_obj, s_keypair_pubkey);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_pubkey_obj, s_keypair_pubkey);
 
-STATIC mp_obj_t s_keypair_xonly_pubkey(mp_obj_t self_in) {
+static mp_obj_t s_keypair_xonly_pubkey(mp_obj_t self_in) {
     mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
 
     sec_setup_ctx();
@@ -557,9 +553,9 @@ STATIC mp_obj_t s_keypair_xonly_pubkey(mp_obj_t self_in) {
 
     return MP_OBJ_FROM_PTR(rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_xonly_pubkey_obj, s_keypair_xonly_pubkey);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_keypair_xonly_pubkey_obj, s_keypair_xonly_pubkey);
 
-STATIC mp_obj_t s_keypair_xonly_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in) {
+static mp_obj_t s_keypair_xonly_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in) {
     //  Tweak a keypair by adding tweak32 to the secret key and updating the public
     //  key accordingly.
     mp_buffer_info_t tweak32;
@@ -590,7 +586,7 @@ STATIC mp_obj_t s_keypair_xonly_tweak_add(mp_obj_t self_in, mp_obj_t tweak32_in)
     return MP_OBJ_FROM_PTR(rv);
 
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_xonly_tweak_add_obj, s_keypair_xonly_tweak_add);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_xonly_tweak_add_obj, s_keypair_xonly_tweak_add);
 
 static int _my_ecdh_hash(uint8_t *output, const uint8_t *x32, const uint8_t *y32, void *data) {
     (void)data;
@@ -600,10 +596,10 @@ static int _my_ecdh_hash(uint8_t *output, const uint8_t *x32, const uint8_t *y32
     mbedtls_sha256_context ctx;
 
     mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, x32, 32);
-    mbedtls_sha256_update_ret(&ctx, y32, 32);
-    mbedtls_sha256_finish_ret(&ctx, output);
+    mbedtls_sha256_starts(&ctx, 0);
+    mbedtls_sha256_update(&ctx, x32, 32);
+    mbedtls_sha256_update(&ctx, y32, 32);
+    mbedtls_sha256_finish(&ctx, output);
     mbedtls_sha256_free(&ctx);
 
 #else
@@ -618,7 +614,7 @@ static int _my_ecdh_hash(uint8_t *output, const uint8_t *x32, const uint8_t *y32
     return 1;
 }
 
-STATIC mp_obj_t s_keypair_ecdh_multiply(mp_obj_t self_in, mp_obj_t other_point_in) {
+static mp_obj_t s_keypair_ecdh_multiply(mp_obj_t self_in, mp_obj_t other_point_in) {
     mp_obj_keypair_t *self = MP_OBJ_TO_PTR(self_in);
 
     // returns sha256(pubkey64(privkey * other_pubkey_point))
@@ -636,22 +632,21 @@ STATIC mp_obj_t s_keypair_ecdh_multiply(mp_obj_t self_in, mp_obj_t other_point_i
     uint8_t seckey[32];
 	secp256k1_keypair_sec(lib_ctx, seckey, &self->keypair);
 
-    vstr_t rv;
-    vstr_init_len(&rv, 32);
+    uint8_t rv[32];
 
-    ok = secp256k1_ecdh(lib_ctx, (uint8_t *)rv.buf, &other_point, seckey, _my_ecdh_hash, NULL);
+    ok = secp256k1_ecdh(lib_ctx, rv, &other_point, seckey, _my_ecdh_hash, NULL);
     if(!ok) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ecdh"));
     }
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
+    return mp_obj_new_bytes(rv, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_ecdh_multiply_obj, s_keypair_ecdh_multiply);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_ecdh_multiply_obj, s_keypair_ecdh_multiply);
 
 
 // MuSig2
 
-STATIC mp_obj_t s_musig_keyagg_cache_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_musig_keyagg_cache_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, 0, false);
     mp_obj_musig_keyagg_cache_t *cache = m_new_obj(mp_obj_musig_keyagg_cache_t);
 	cache->base.type = type;
@@ -660,9 +655,9 @@ STATIC mp_obj_t s_musig_keyagg_cache_make_new(const mp_obj_type_t *type, size_t 
 }
 
 
-STATIC mp_obj_t s_musig_pubkey_agg(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+static mp_obj_t s_musig_pubkey_agg(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
 
-	STATIC const mp_arg_t allowed_args[] = {
+	static const mp_arg_t allowed_args[] = {
         { MP_QSTR_pubkeys,        MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
         { MP_QSTR_keyagg_cache,                     MP_ARG_OBJ, {.u_obj = mp_const_none} },
         { MP_QSTR_sort,                             MP_ARG_OBJ, {.u_obj = mp_const_true} },
@@ -728,7 +723,7 @@ MP_DEFINE_CONST_FUN_OBJ_KW(s_musig_pubkey_agg_obj, 1, s_musig_pubkey_agg);
 
 
 // when non-xonly aggregate pubkey is needed
-STATIC mp_obj_t s_musig_pubkey_get(mp_obj_t keyagg_cache_in){
+static mp_obj_t s_musig_pubkey_get(mp_obj_t keyagg_cache_in){
 
     mp_obj_musig_keyagg_cache_t *cache = MP_OBJ_TO_PTR(keyagg_cache_in);
 
@@ -741,10 +736,10 @@ STATIC mp_obj_t s_musig_pubkey_get(mp_obj_t keyagg_cache_in){
     }
     return MP_OBJ_FROM_PTR(pubkey);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_musig_pubkey_get_obj, s_musig_pubkey_get);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_musig_pubkey_get_obj, s_musig_pubkey_get);
 
 
-STATIC mp_obj_t s_musig_pubkey_ec_tweak_add(mp_obj_t keyagg_cache_in, mp_obj_t tweak32_in){
+static mp_obj_t s_musig_pubkey_ec_tweak_add(mp_obj_t keyagg_cache_in, mp_obj_t tweak32_in){
 
     if(mp_obj_get_type(keyagg_cache_in) != &s_musig_keyagg_cache_type) {
         mp_raise_TypeError(MP_ERROR_TEXT("key aggregation cache type"));
@@ -769,10 +764,10 @@ STATIC mp_obj_t s_musig_pubkey_ec_tweak_add(mp_obj_t keyagg_cache_in, mp_obj_t t
 
     return MP_OBJ_FROM_PTR(res);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_musig_pubkey_ec_tweak_add_obj, s_musig_pubkey_ec_tweak_add);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_musig_pubkey_ec_tweak_add_obj, s_musig_pubkey_ec_tweak_add);
 
 
-STATIC mp_obj_t s_musig_pubkey_xonly_tweak_add(mp_obj_t keyagg_cache_in, mp_obj_t tweak32_in){
+static mp_obj_t s_musig_pubkey_xonly_tweak_add(mp_obj_t keyagg_cache_in, mp_obj_t tweak32_in){
 
     if(mp_obj_get_type(keyagg_cache_in) != &s_musig_keyagg_cache_type) {
         mp_raise_TypeError(MP_ERROR_TEXT("key aggregation cache type"));
@@ -797,12 +792,12 @@ STATIC mp_obj_t s_musig_pubkey_xonly_tweak_add(mp_obj_t keyagg_cache_in, mp_obj_
 
     return MP_OBJ_FROM_PTR(res);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_musig_pubkey_xonly_tweak_add_obj, s_musig_pubkey_xonly_tweak_add);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_musig_pubkey_xonly_tweak_add_obj, s_musig_pubkey_xonly_tweak_add);
 
 
-STATIC mp_obj_t s_musig_nonce_gen(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+static mp_obj_t s_musig_nonce_gen(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
 
-	STATIC const mp_arg_t allowed_args[] = {
+	static const mp_arg_t allowed_args[] = {
         { MP_QSTR_pubkey,         MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}   },
         { MP_QSTR_secrand,                          MP_ARG_OBJ, {.u_obj = mp_const_none} },
         { MP_QSTR_seckey,                           MP_ARG_OBJ, {.u_obj = mp_const_none} },
@@ -908,21 +903,20 @@ STATIC mp_obj_t s_musig_nonce_gen(size_t n_args, const mp_obj_t *pos_args, mp_ma
 MP_DEFINE_CONST_FUN_OBJ_KW(s_musig_nonce_gen_obj, 1, s_musig_nonce_gen);
 
 
-STATIC mp_obj_t s_pubnonce_to_bytes(mp_obj_t pubnonce_in) {
+static mp_obj_t s_pubnonce_to_bytes(mp_obj_t pubnonce_in) {
     mp_obj_musig_pubnonce_t *self = MP_OBJ_TO_PTR(pubnonce_in);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 66);
+    uint8_t rv[66];
 
-    secp256k1_musig_pubnonce_serialize(secp256k1_context_static, (uint8_t *)vstr.buf, &self->pubnonce);
+    secp256k1_musig_pubnonce_serialize(secp256k1_context_static, rv, &self->pubnonce);
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(rv, 66);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_pubnonce_to_bytes_obj, s_pubnonce_to_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_pubnonce_to_bytes_obj, s_pubnonce_to_bytes);
 
 
 // Constructor for pubnonce
-STATIC mp_obj_t s_pubnonce_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_pubnonce_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
 
     mp_obj_musig_pubnonce_t *self = m_new_obj(mp_obj_musig_pubnonce_t);
@@ -944,21 +938,20 @@ STATIC mp_obj_t s_pubnonce_make_new(const mp_obj_type_t *type, size_t n_args, si
 }
 
 
-STATIC mp_obj_t s_aggnonce_to_bytes(mp_obj_t aggnonce_in) {
+static mp_obj_t s_aggnonce_to_bytes(mp_obj_t aggnonce_in) {
     mp_obj_musig_aggnonce_t *self = MP_OBJ_TO_PTR(aggnonce_in);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 66);
+    uint8_t rv[66];
 
-    secp256k1_musig_aggnonce_serialize(secp256k1_context_static, (uint8_t *)vstr.buf, &self->aggnonce);
+    secp256k1_musig_aggnonce_serialize(secp256k1_context_static, rv, &self->aggnonce);
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(rv, 66);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_aggnonce_to_bytes_obj, s_aggnonce_to_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_aggnonce_to_bytes_obj, s_aggnonce_to_bytes);
 
 
 // Constructor for aggregate nonce
-STATIC mp_obj_t s_aggnonce_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_aggnonce_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
 
     mp_obj_musig_aggnonce_t *self = m_new_obj(mp_obj_musig_aggnonce_t);
@@ -980,7 +973,7 @@ STATIC mp_obj_t s_aggnonce_make_new(const mp_obj_type_t *type, size_t n_args, si
 }
 
 
-STATIC mp_obj_t s_musig_nonce_agg(mp_obj_t pubnonces_in){
+static mp_obj_t s_musig_nonce_agg(mp_obj_t pubnonces_in){
     if (!mp_obj_is_type(pubnonces_in, &mp_type_list)) {
         mp_raise_TypeError(MP_ERROR_TEXT("Expected a list object"));
     }
@@ -1011,10 +1004,10 @@ STATIC mp_obj_t s_musig_nonce_agg(mp_obj_t pubnonces_in){
 
     return MP_OBJ_FROM_PTR(an);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_musig_nonce_agg_obj, s_musig_nonce_agg);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_musig_nonce_agg_obj, s_musig_nonce_agg);
 
 
-STATIC mp_obj_t s_musig_nonce_process(mp_obj_t aggnonce_in, mp_obj_t msg32_in, mp_obj_t keyagg_cache_in){
+static mp_obj_t s_musig_nonce_process(mp_obj_t aggnonce_in, mp_obj_t msg32_in, mp_obj_t keyagg_cache_in){
 
     if(mp_obj_get_type(aggnonce_in) != &s_musig_aggnonce_type) {
         mp_raise_TypeError(MP_ERROR_TEXT("aggnonce type"));
@@ -1046,11 +1039,11 @@ STATIC mp_obj_t s_musig_nonce_process(mp_obj_t aggnonce_in, mp_obj_t msg32_in, m
 
     return MP_OBJ_FROM_PTR(session);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(s_musig_nonce_process_obj, s_musig_nonce_process);
+static MP_DEFINE_CONST_FUN_OBJ_3(s_musig_nonce_process_obj, s_musig_nonce_process);
 
 
 // Constructor for musig partial signature
-STATIC mp_obj_t s_musig_partial_sig_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t s_musig_partial_sig_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
 
     mp_obj_musig_partial_sig_t *self = m_new_obj(mp_obj_musig_partial_sig_t);
@@ -1070,20 +1063,19 @@ STATIC mp_obj_t s_musig_partial_sig_make_new(const mp_obj_type_t *type, size_t n
     return MP_OBJ_FROM_PTR(self);
 }
 
-STATIC mp_obj_t s_musig_partial_sig_to_bytes(mp_obj_t part_sig_in) {
+static mp_obj_t s_musig_partial_sig_to_bytes(mp_obj_t part_sig_in) {
     mp_obj_musig_partial_sig_t *self = MP_OBJ_TO_PTR(part_sig_in);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 32);
+    uint8_t rv[32];
 
-    secp256k1_musig_partial_sig_serialize(secp256k1_context_static, (uint8_t *)vstr.buf, &self->sig);
+    secp256k1_musig_partial_sig_serialize(secp256k1_context_static, rv, &self->sig);
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(rv, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_musig_partial_sig_to_bytes_obj, s_musig_partial_sig_to_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_musig_partial_sig_to_bytes_obj, s_musig_partial_sig_to_bytes);
 
 
-STATIC mp_obj_t s_musig_partial_sign(size_t n_args, const mp_obj_t *args){
+static mp_obj_t s_musig_partial_sign(size_t n_args, const mp_obj_t *args){
 
     if(mp_obj_get_type(args[0]) != &s_musig_secnonce_type) {
         mp_raise_TypeError(MP_ERROR_TEXT("secnonce type"));
@@ -1120,11 +1112,11 @@ STATIC mp_obj_t s_musig_partial_sign(size_t n_args, const mp_obj_t *args){
 
     return MP_OBJ_FROM_PTR(res);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_musig_partial_sign_obj, 4, 4, s_musig_partial_sign);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_musig_partial_sign_obj, 4, 4, s_musig_partial_sign);
 
 
 // verify musig partial sig
-STATIC mp_obj_t s_musig_partial_sig_verify(size_t n_args, const mp_obj_t *args)
+static mp_obj_t s_musig_partial_sig_verify(size_t n_args, const mp_obj_t *args)
 {
     // no need to verify partial sig type as it this is method of the object
     if(mp_obj_get_type(args[1]) != &s_musig_pubnonce_type) {
@@ -1157,10 +1149,10 @@ STATIC mp_obj_t s_musig_partial_sig_verify(size_t n_args, const mp_obj_t *args)
 
     return mp_obj_new_int(ok);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_musig_partial_sig_verify_obj, 5, 5, s_musig_partial_sig_verify);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(s_musig_partial_sig_verify_obj, 5, 5, s_musig_partial_sig_verify);
 
 
-STATIC mp_obj_t s_musig_partial_sig_agg(mp_obj_t part_sigs_in, mp_obj_t session_in){
+static mp_obj_t s_musig_partial_sig_agg(mp_obj_t part_sigs_in, mp_obj_t session_in){
 
     if (!mp_obj_is_type(part_sigs_in, &mp_type_list)) {
         mp_raise_TypeError(MP_ERROR_TEXT("Expected a list object"));
@@ -1188,142 +1180,150 @@ STATIC mp_obj_t s_musig_partial_sig_agg(mp_obj_t part_sigs_in, mp_obj_t session_
 
     mp_obj_musig_session_t *session = MP_OBJ_TO_PTR(session_in);
 
-    vstr_t res;
-    vstr_init_len(&res, 64);
+    uint8_t res[64];
 
-    int ok = secp256k1_musig_partial_sig_agg(lib_ctx, (uint8_t *)res.buf, &session->session, ps, len_part_sigs);
+    int ok = secp256k1_musig_partial_sig_agg(lib_ctx, res, &session->session, ps, len_part_sigs);
     if (!ok) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_musig_partial_sig_agg invalid arguments"));
     }
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &res);
+    return mp_obj_new_bytes(res, 64);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_musig_partial_sig_agg_obj, s_musig_partial_sig_agg);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_musig_partial_sig_agg_obj, s_musig_partial_sig_agg);
 
 
 // sigs and what you can do with them
-STATIC const mp_rom_map_elem_t s_sig_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_sig_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_sig_to_bytes_obj) },
     { MP_ROM_QSTR(MP_QSTR_verify_recover), MP_ROM_PTR(&s_sig_verify_recover_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_sig_locals_dict, s_sig_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_sig_locals_dict, s_sig_locals_dict_table);
 
-STATIC const mp_obj_type_t s_sig_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_sig,
-    .make_new = s_sig_make_new,
-    .locals_dict = (void *)&s_sig_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_sig_type,
+    MP_QSTR_secp256k1_sig,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_sig_make_new,
+    locals_dict, &s_sig_locals_dict
+);
 
 // musig partial signature
-STATIC const mp_rom_map_elem_t s_musig_partial_sig_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_musig_partial_sig_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_musig_partial_sig_to_bytes_obj) },
     { MP_ROM_QSTR(MP_QSTR_verify), MP_ROM_PTR(&s_musig_partial_sig_verify_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_musig_partial_sig_locals_dict, s_musig_partial_sig_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_musig_partial_sig_locals_dict, s_musig_partial_sig_locals_dict_table);
 
-STATIC const mp_obj_type_t s_musig_partial_sig_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_musig_partial_sig,
-    .make_new = s_musig_partial_sig_make_new,
-    .locals_dict = (void *)&s_musig_partial_sig_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_musig_partial_sig_type,
+    MP_QSTR_secp256k1_musig_partial_sig,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_musig_partial_sig_make_new,
+    locals_dict, &s_musig_partial_sig_locals_dict
+);
 
 // pubkeys and what you can do with them
-STATIC const mp_rom_map_elem_t s_pubkey_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_pubkey_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_pubkey_to_bytes_obj) },
     { MP_ROM_QSTR(MP_QSTR_to_xonly), MP_ROM_PTR(&s_pubkey_to_xonly_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_pubkey_locals_dict, s_pubkey_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_pubkey_locals_dict, s_pubkey_locals_dict_table);
 
-STATIC const mp_rom_map_elem_t s_xonly_pubkey_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_xonly_pubkey_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_xonly_pubkey_to_bytes_obj) },
     { MP_ROM_QSTR(MP_QSTR_parity), MP_ROM_PTR(&s_xonly_pubkey_parity_obj) },
     { MP_ROM_QSTR(MP_QSTR_tweak_add), MP_ROM_PTR(&s_xonly_pubkey_tweak_add_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_xonly_pubkey_locals_dict, s_xonly_pubkey_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_xonly_pubkey_locals_dict, s_xonly_pubkey_locals_dict_table);
 
-STATIC const mp_obj_type_t s_pubkey_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_pubkey,
-    .make_new = s_pubkey_make_new,
-    .locals_dict = (void *)&s_pubkey_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_pubkey_type,
+    MP_QSTR_secp256k1_pubkey,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_pubkey_make_new,
+    locals_dict, &s_pubkey_locals_dict
+);
 
-STATIC const mp_obj_type_t s_xonly_pubkey_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_xonly_pubkey,
-    .make_new = s_xonly_pubkey_make_new,
-    .locals_dict = (void *)&s_xonly_pubkey_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_xonly_pubkey_type,
+    MP_QSTR_secp256k1_xonly_pubkey,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_xonly_pubkey_make_new,
+    locals_dict, &s_xonly_pubkey_locals_dict
+);
 
 // musig opaque
-STATIC const mp_obj_type_t s_musig_session_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_musig_session,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_musig_session_type,
+    MP_QSTR_secp256k1_musig_session,
+    MP_TYPE_FLAG_NONE
+);
 
-STATIC const mp_rom_map_elem_t s_musig_keyagg_cache_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_musig_keyagg_cache_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_agg_pubkey), MP_ROM_PTR(&s_musig_pubkey_get_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_musig_keyagg_cache_locals_dict, s_musig_keyagg_cache_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_musig_keyagg_cache_locals_dict, s_musig_keyagg_cache_locals_dict_table);
 
-STATIC const mp_obj_type_t s_musig_keyagg_cache_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_musig_keyagg_cache,
-    .make_new = s_musig_keyagg_cache_make_new,
-    .locals_dict = (void *)&s_musig_keyagg_cache_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_musig_keyagg_cache_type,
+    MP_QSTR_secp256k1_musig_keyagg_cache,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_musig_keyagg_cache_make_new,
+    locals_dict, &s_musig_keyagg_cache_locals_dict
+);
 
 // musig nonces
-STATIC const mp_rom_map_elem_t s_musig_pubnonce_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_musig_pubnonce_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_pubnonce_to_bytes_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_musig_pubnonce_locals_dict, s_musig_pubnonce_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_musig_pubnonce_locals_dict, s_musig_pubnonce_locals_dict_table);
 
-STATIC const mp_obj_type_t s_musig_pubnonce_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_musig_pubnonce,
-    .make_new = s_pubnonce_make_new,
-    .locals_dict = (void *)&s_musig_pubnonce_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_musig_pubnonce_type,
+    MP_QSTR_secp256k1_musig_pubnonce,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_pubnonce_make_new,
+    locals_dict, &s_musig_pubnonce_locals_dict
+);
 
-STATIC const mp_rom_map_elem_t s_musig_aggnonce_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_musig_aggnonce_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&s_aggnonce_to_bytes_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_musig_aggnonce_locals_dict, s_musig_aggnonce_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_musig_aggnonce_locals_dict, s_musig_aggnonce_locals_dict_table);
 
-STATIC const mp_obj_type_t s_musig_aggnonce_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_musig_aggnonce,
-    .make_new = s_aggnonce_make_new,
-    .locals_dict = (void *)&s_musig_aggnonce_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_musig_aggnonce_type,
+    MP_QSTR_secp256k1_musig_aggnonce,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_aggnonce_make_new,
+    locals_dict, &s_musig_aggnonce_locals_dict
+);
 
-STATIC const mp_obj_type_t s_musig_secnonce_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_musig_secnonce,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_musig_secnonce_type,
+    MP_QSTR_secp256k1_musig_secnonce,
+    MP_TYPE_FLAG_NONE
+);
 
 // privkeys and what you can do with them
-STATIC const mp_rom_map_elem_t s_keypair_locals_dict_table[] = {
+static const mp_rom_map_elem_t s_keypair_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_privkey), MP_ROM_PTR(&s_keypair_privkey_obj) },
     { MP_ROM_QSTR(MP_QSTR_pubkey), MP_ROM_PTR(&s_keypair_pubkey_obj) },
     { MP_ROM_QSTR(MP_QSTR_xonly_pubkey), MP_ROM_PTR(&s_keypair_xonly_pubkey_obj) },
     { MP_ROM_QSTR(MP_QSTR_xonly_tweak_add), MP_ROM_PTR(&s_keypair_xonly_tweak_add_obj) },
     { MP_ROM_QSTR(MP_QSTR_ecdh_multiply), MP_ROM_PTR(&s_keypair_ecdh_multiply_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(s_keypair_locals_dict, s_keypair_locals_dict_table);
+static MP_DEFINE_CONST_DICT(s_keypair_locals_dict, s_keypair_locals_dict_table);
 
-STATIC const mp_obj_type_t s_keypair_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_secp256k1_keypair,
-    .make_new = s_keypair_make_new,
-    .locals_dict = (void *)&s_keypair_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    s_keypair_type,
+    MP_QSTR_secp256k1_keypair,
+    MP_TYPE_FLAG_NONE,
+    make_new, s_keypair_make_new,
+    locals_dict, &s_keypair_locals_dict
+);
 
-
-STATIC const mp_rom_map_elem_t globals_table[] = {
+static const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_secp256k1) },
 
     { MP_ROM_QSTR(MP_QSTR_pubkey), MP_ROM_PTR(&s_pubkey_type) },
@@ -1349,7 +1349,7 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_musig_partial_sig_agg), MP_ROM_PTR(&s_musig_partial_sig_agg_obj) },
 };
 
-STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);
+static MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);
 
 const mp_obj_module_t mp_module_secp256k1 = {
     .base = { &mp_type_module },

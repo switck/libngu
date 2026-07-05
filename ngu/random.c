@@ -55,7 +55,7 @@ extern uint32_t rng_get(void);
 static uint32_t yasmarang_pad = 0x0a8ce26f, yasmarang_n = 69, yasmarang_d = 233;
 static uint8_t yasmarang_dat = 0;
 
-STATIC uint32_t my_yasmarang(void) {
+static uint32_t my_yasmarang(void) {
     yasmarang_pad += yasmarang_dat + yasmarang_d * yasmarang_n;
     yasmarang_pad = (yasmarang_pad << 3) + (yasmarang_pad >> 29);
     yasmarang_n = yasmarang_pad | 2;
@@ -88,7 +88,7 @@ void my_random_bytes(uint8_t *dest, uint32_t count)
     }
 }
 
-STATIC mp_obj_t random_uint32(void) {
+static mp_obj_t random_uint32(void) {
     // full 32-bit values, not 30
     CHIP_TRNG_SETUP();
 
@@ -98,7 +98,7 @@ STATIC mp_obj_t random_uint32(void) {
 
     return mp_obj_new_int_from_uint(rv);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(random_uint32_obj, random_uint32);
+static MP_DEFINE_CONST_FUN_OBJ_0(random_uint32_obj, random_uint32);
 
 int _bit_length(uint32_t x)
 {
@@ -134,41 +134,40 @@ int _rand_below(int mx)
     }
 }
 
-STATIC mp_obj_t random_uniform(mp_obj_t mx_in) {
+static mp_obj_t random_uniform(mp_obj_t mx_in) {
     int mx = mp_obj_get_int_truncated(mx_in);
 
     return mp_obj_new_int_from_uint(_rand_below(mx));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_uniform_obj, random_uniform);
+static MP_DEFINE_CONST_FUN_OBJ_1(random_uniform_obj, random_uniform);
 
 
-STATIC mp_obj_t random_bytes(mp_obj_t count_in)
+static mp_obj_t random_bytes(mp_obj_t count_in)
 {
     int count = mp_obj_get_int_truncated(count_in);
     if(count > 4096) {
         mp_raise_ValueError(MP_ERROR_TEXT("too many"));
     }
 
-    vstr_t rv;
-    vstr_init_len(&rv, count);
+    uint8_t rv[count];
 
-    my_random_bytes((uint8_t *)rv.buf, count);
+    my_random_bytes(rv, count);
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &rv);
+    return mp_obj_new_bytes(rv, count);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_bytes_obj, random_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_1(random_bytes_obj, random_bytes);
 
 
-STATIC mp_obj_t random_reseed(mp_obj_t arg)
+static mp_obj_t random_reseed(mp_obj_t arg)
 {
     yasmarang_pad = mp_obj_get_int_truncated(arg);
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_reseed_obj, random_reseed);
+static MP_DEFINE_CONST_FUN_OBJ_1(random_reseed_obj, random_reseed);
 
 
-STATIC const mp_rom_map_elem_t globals_table[] = {
+static const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_random) },
 
     { MP_ROM_QSTR(MP_QSTR_bytes), MP_ROM_PTR(&random_bytes_obj) },
@@ -177,7 +176,7 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_reseed), MP_ROM_PTR(&random_reseed_obj) },
 };
 
-STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);
+static MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);
 
 const mp_obj_module_t mp_module_random = {
     .base = { &mp_type_module },

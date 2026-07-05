@@ -42,36 +42,13 @@ void ripemd160(const uint8_t *msg, int msglen, uint8_t digest[20]);
 // SHA512
 //
 
-STATIC mp_obj_t modngu_hash_sha512_update(mp_obj_t self_in, mp_obj_t arg);
-
-STATIC mp_obj_t modngu_hash_sha512_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 0, 1, false);
-#if MICROPY_SSL_MBEDTLS
-    mp_obj_hash_t *o = m_new_obj_var(mp_obj_hash_t, char, sizeof(mbedtls_sha512_context));
-    o->base.type = type;
-
-    mbedtls_sha512_init((mbedtls_sha512_context *)o->state);
-    mbedtls_sha512_starts_ret((mbedtls_sha512_context *)o->state, false);
-#else
-    mp_obj_hash_t *o = m_new_obj_var(mp_obj_hash_t, char, sizeof(cf_sha512_context));
-    o->base.type = type;
-    cf_sha512_init((cf_sha512_context *)o->state);
-#endif
-
-    if(n_args == 1) {
-        modngu_hash_sha512_update(MP_OBJ_FROM_PTR(o), args[0]);
-    }
-
-    return MP_OBJ_FROM_PTR(o);
-}
-
-STATIC mp_obj_t modngu_hash_sha512_update(mp_obj_t self_in, mp_obj_t arg) {
+static mp_obj_t modngu_hash_sha512_update(mp_obj_t self_in, mp_obj_t arg) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(arg, &bufinfo, MP_BUFFER_READ);
 
 #if MICROPY_SSL_MBEDTLS
-    mbedtls_sha512_update_ret((mbedtls_sha512_context *)self->state, bufinfo.buf, bufinfo.len);
+    mbedtls_sha512_update((mbedtls_sha512_context *)self->state, bufinfo.buf, bufinfo.len);
 #else
     cf_sha512_update((cf_sha512_context *)self->state, bufinfo.buf, bufinfo.len);
 #endif
@@ -79,40 +56,67 @@ STATIC mp_obj_t modngu_hash_sha512_update(mp_obj_t self_in, mp_obj_t arg) {
     return mp_const_none;
 }
 
-STATIC mp_obj_t modngu_hash_sha512_digest(mp_obj_t self_in) {
-    mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-
-    vstr_t vstr;
-    vstr_init_len(&vstr, 64);
+static mp_obj_t modngu_hash_sha512_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+    mp_arg_check_num(n_args, n_kw, 0, 1, false);
 
 #if MICROPY_SSL_MBEDTLS
-    mbedtls_sha512_finish_ret((mbedtls_sha512_context *)self->state, (byte *)vstr.buf);
-    mbedtls_sha512_free((mbedtls_sha512_context *)self->state);
+    // New v1.28 allocation: 4 arguments + correct field name + uintptr_t alignment
+    size_t n = (sizeof(mbedtls_sha512_context) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+    mp_obj_hash_t *o = m_new_obj_var(mp_obj_hash_t, state, uintptr_t, n);
+    o->base.type = type;
+
+    mbedtls_sha512_init((mbedtls_sha512_context *)o->state);
+    mbedtls_sha512_starts((mbedtls_sha512_context *)o->state, false);
 #else
-    cf_sha512_digest_final((cf_sha512_context *)self->state, (byte *)vstr.buf);
+    // Same pattern for the tinycrypt/cf fallback
+    size_t n = (sizeof(cf_sha512_context) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+    mp_obj_hash_t *o = m_new_obj_var(mp_obj_hash_t, state, uintptr_t, n);
+    o->base.type = type;
+
+    cf_sha512_init((cf_sha512_context *)o->state);
 #endif
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    if (n_args == 1) {
+        modngu_hash_sha512_update(MP_OBJ_FROM_PTR(o), args[0]);
+    }
+
+    return MP_OBJ_FROM_PTR(o);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(modngu_hash_sha512_update_obj, modngu_hash_sha512_update);
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(modngu_hash_sha512_digest_obj, modngu_hash_sha512_digest);
+static mp_obj_t modngu_hash_sha512_digest(mp_obj_t self_in) {
+    mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
 
-STATIC const mp_rom_map_elem_t modngu_hash_sha512_locals_dict_table[] = {
+    uint8_t rv[64];
+
+#if MICROPY_SSL_MBEDTLS
+    mbedtls_sha512_finish((mbedtls_sha512_context *)self->state, rv);
+    mbedtls_sha512_free((mbedtls_sha512_context *)self->state);
+#else
+    cf_sha512_digest_final((cf_sha512_context *)self->state, rv);
+#endif
+
+    return mp_obj_new_bytes(rv, 64);
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_2(modngu_hash_sha512_update_obj, modngu_hash_sha512_update);
+static MP_DEFINE_CONST_FUN_OBJ_1(modngu_hash_sha512_digest_obj, modngu_hash_sha512_digest);
+
+static const mp_rom_map_elem_t modngu_hash_sha512_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_update), MP_ROM_PTR(&modngu_hash_sha512_update_obj) },
     { MP_ROM_QSTR(MP_QSTR_digest), MP_ROM_PTR(&modngu_hash_sha512_digest_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(modngu_hash_sha512_locals_dict, modngu_hash_sha512_locals_dict_table);
+static MP_DEFINE_CONST_DICT(modngu_hash_sha512_locals_dict, modngu_hash_sha512_locals_dict_table);
 
-STATIC const mp_obj_type_t modngu_hash_sha512_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_sha512,
-    .make_new = modngu_hash_sha512_make_new,
-    .locals_dict = (void *)&modngu_hash_sha512_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    modngu_hash_sha512_type,
+    MP_QSTR_sha512,
+    MP_TYPE_FLAG_NONE,
+    make_new, modngu_hash_sha512_make_new,
+    locals_dict, &modngu_hash_sha512_locals_dict
+);
 
 // Tagged sha256 = SHA256(SHA256(tag)||SHA256(tag)||msg)
-STATIC mp_obj_t hm_tagged_sha256(size_t n_args, const mp_obj_t *args) {
+static mp_obj_t hm_tagged_sha256(size_t n_args, const mp_obj_t *args) {
     mp_obj_t tag = args[0];
     mp_obj_t msg = args[1];
     bool is_tag_hashed = false;
@@ -139,80 +143,76 @@ STATIC mp_obj_t hm_tagged_sha256(size_t n_args, const mp_obj_t *args) {
     memcpy(ser + 32, s0, 32);
     memcpy(ser + 64, m.buf, m.len);
 
-    vstr_t res;
-    vstr_init_len(&res, 32);
-    sha256_single(ser, ser_len, (uint8_t *)res.buf);
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &res);
+    uint8_t res[32];
+    sha256_single(ser, ser_len, res);
+
+    return mp_obj_new_bytes(res, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(hm_tagged_sha256_obj,2,3, hm_tagged_sha256);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(hm_tagged_sha256_obj,2,3, hm_tagged_sha256);
 
 // Double sha256 = sha256(sha256('foo').digest()).digest() ... in one step
-STATIC mp_obj_t hm_double_sha256(mp_obj_t arg) {
+static mp_obj_t hm_double_sha256(mp_obj_t arg) {
     mp_buffer_info_t inp;
     mp_get_buffer_raise(arg, &inp, MP_BUFFER_READ);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 32);
+    uint8_t res[32];
 
-    sha256_double(inp.buf, inp.len, (uint8_t *)vstr.buf);
+    sha256_double(inp.buf, inp.len, res);
     
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(res, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(hm_double_sha256_obj, hm_double_sha256);
+static MP_DEFINE_CONST_FUN_OBJ_1(hm_double_sha256_obj, hm_double_sha256);
 
 // single-shot sha256/ripe/etc
 
-STATIC mp_obj_t hm_single_sha256(mp_obj_t arg) {
+static mp_obj_t hm_single_sha256(mp_obj_t arg) {
     mp_buffer_info_t inp;
     mp_get_buffer_raise(arg, &inp, MP_BUFFER_READ);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 32);
+    uint8_t res[32];
 
-    sha256_single(inp.buf, inp.len, (uint8_t *)vstr.buf);
+    sha256_single(inp.buf, inp.len, res);
     
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(res, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(hm_single_sha256_obj, hm_single_sha256);
+static MP_DEFINE_CONST_FUN_OBJ_1(hm_single_sha256_obj, hm_single_sha256);
 
-STATIC mp_obj_t hm_single_ripemd160(mp_obj_t arg) {
+static mp_obj_t hm_single_ripemd160(mp_obj_t arg) {
     mp_buffer_info_t inp;
     mp_get_buffer_raise(arg, &inp, MP_BUFFER_READ);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 20);
+    uint8_t res[20];
 
 #if 0
     mbedtls_ripemd160_context ctx;
     mbedtls_ripemd160_init(&ctx);
-    mbedtls_ripemd160_starts_ret(&ctx);
-    mbedtls_ripemd160_update_ret(&ctx, inp.buf, inp.len);
-    mbedtls_ripemd160_finish_ret(&ctx, (uint8_t *)vstr.buf);
+    mbedtls_ripemd160_starts(&ctx);
+    mbedtls_ripemd160_update(&ctx, inp.buf, inp.len);
+    mbedtls_ripemd160_finish(&ctx, res);
     mbedtls_ripemd160_free(&ctx);
 #endif
-    ripemd160(inp.buf, inp.len, (uint8_t *)vstr.buf);
+    ripemd160(inp.buf, inp.len, res);
     
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(res, 20);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(hm_single_ripemd160_obj, hm_single_ripemd160);
+static MP_DEFINE_CONST_FUN_OBJ_1(hm_single_ripemd160_obj, hm_single_ripemd160);
 
-STATIC mp_obj_t hm_hash160(mp_obj_t arg) {
+static mp_obj_t hm_hash160(mp_obj_t arg) {
     mp_buffer_info_t inp;
     mp_get_buffer_raise(arg, &inp, MP_BUFFER_READ);
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 20);
+    uint8_t res[20];
 
-    hash160(inp.buf, inp.len, (uint8_t *)vstr.buf);
+    hash160(inp.buf, inp.len, res);
     
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(res, 20);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(hm_hash160_obj, hm_hash160);
+static MP_DEFINE_CONST_FUN_OBJ_1(hm_hash160_obj, hm_hash160);
 
 
 // Pbkdf2 using sha512 hmac, for use in BIP39=>BIP32 seed
-STATIC mp_obj_t pbkdf2_sha512(mp_obj_t pass_in, mp_obj_t salt_in, mp_obj_t rounds_in) {
+static mp_obj_t pbkdf2_sha512(mp_obj_t pass_in, mp_obj_t salt_in, mp_obj_t rounds_in) {
     mp_buffer_info_t pass, salt;
     mp_get_buffer_raise(pass_in, &pass, MP_BUFFER_READ);
     mp_get_buffer_raise(salt_in, &salt, MP_BUFFER_READ);
@@ -222,10 +222,9 @@ STATIC mp_obj_t pbkdf2_sha512(mp_obj_t pass_in, mp_obj_t salt_in, mp_obj_t round
     const mbedtls_md_info_t *md_algo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
 #endif
 
-    vstr_t key_out;
-    vstr_init_len(&key_out, H_SIZE);
     uint32_t key_len = H_SIZE;
-    uint8_t *key = (uint8_t *)key_out.buf;
+    uint8_t key_arr[H_SIZE];
+    uint8_t *key = key_arr;
 
     // Based on https://github.com/openbsd/src/blob/master/lib/libutil/pkcs5_pbkdf2.c
 
@@ -281,12 +280,12 @@ STATIC mp_obj_t pbkdf2_sha512(mp_obj_t pass_in, mp_obj_t salt_in, mp_obj_t round
 	explicit_bzero(obuf, sizeof(obuf));
 */
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &key_out);
+    return mp_obj_new_bytes(key_arr, H_SIZE);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(pbkdf2_sha512_obj, pbkdf2_sha512);
+static MP_DEFINE_CONST_FUN_OBJ_3(pbkdf2_sha512_obj, pbkdf2_sha512);
 
 
-STATIC const mp_rom_map_elem_t mp_module_hash_globals_table[] = {
+static const mp_rom_map_elem_t mp_module_hash_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_hash) },
 
     { MP_ROM_QSTR(MP_QSTR_sha512), MP_ROM_PTR(&modngu_hash_sha512_type) },
@@ -299,7 +298,7 @@ STATIC const mp_rom_map_elem_t mp_module_hash_globals_table[] = {
 
 };
 
-STATIC MP_DEFINE_CONST_DICT(mp_module_hash_globals, mp_module_hash_globals_table); 
+static MP_DEFINE_CONST_DICT(mp_module_hash_globals, mp_module_hash_globals_table);
 const mp_obj_module_t mp_module_hash = {
     .base = { &mp_type_module },
     .globals = (mp_obj_dict_t *)&mp_module_hash_globals,
@@ -346,9 +345,9 @@ void sha256_single(const uint8_t *msg, int msglen, uint8_t digest[32])
 #if MICROPY_SSL_MBEDTLS
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, msg, msglen);
-    mbedtls_sha256_finish_ret(&ctx, digest);
+    mbedtls_sha256_starts(&ctx, 0);
+    mbedtls_sha256_update(&ctx, msg, msglen);
+    mbedtls_sha256_finish(&ctx, digest);
     mbedtls_sha256_free(&ctx);
 #elif defined(HASH_DATATYPE_8B)
     // Hardware Accelerated on this board.
@@ -396,13 +395,13 @@ void sha256_double(const uint8_t *msg, int msglen, uint8_t digest[32])
     // re-used ctx here (slight savings in stack depth)
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, msg, msglen);
-    mbedtls_sha256_finish_ret(&ctx, digest);
+    mbedtls_sha256_starts(&ctx, 0);
+    mbedtls_sha256_update(&ctx, msg, msglen);
+    mbedtls_sha256_finish(&ctx, digest);
 
-    mbedtls_sha256_starts_ret(&ctx, 0);
-    mbedtls_sha256_update_ret(&ctx, digest, 32);
-    mbedtls_sha256_finish_ret(&ctx, digest);
+    mbedtls_sha256_starts(&ctx, 0);
+    mbedtls_sha256_update(&ctx, digest, 32);
+    mbedtls_sha256_finish(&ctx, digest);
     mbedtls_sha256_free(&ctx);
 #else
     sha256_single(msg, msglen, digest);

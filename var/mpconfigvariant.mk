@@ -9,5 +9,8 @@ PROG = ngu-micropython
 
 MICROPY_SSL_AXTLS = 0
 MICROPY_SSL_MBEDTLS = 1
+MICROPY_PY_BTREE = 0
+
+MBEDTLS_CONFIG_FILE = \"$(VARIANT_DIR)/mbedtls_config_ngu.h\"
 
 

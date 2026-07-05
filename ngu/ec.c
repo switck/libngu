@@ -14,6 +14,9 @@
 
 #include "mbedtls/ecp.h"
 #include "mbedtls/ecdsa.h"
+#include "mbedtls/md.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
 
 #ifndef MBEDTLS_ECP_C
 # error "requires MBEDTLS_ECP_C"
@@ -32,10 +35,10 @@ typedef struct _mp_obj_curve_t {
 
 
 // Constructor
-STATIC mp_obj_t curve_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t curve_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, 1, false);
 
-    mp_obj_curve_t *o = m_new_obj_with_finaliser(mp_obj_curve_t);
+    mp_obj_curve_t *o = (mp_obj_curve_t *)m_malloc_with_finaliser(sizeof(mp_obj_curve_t));
     o->base.type = type;
     mbedtls_ecp_group_init(&o->grp);
 
@@ -46,18 +49,18 @@ STATIC mp_obj_t curve_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
 }
 
 // Finalizer
-STATIC mp_obj_t curve_del(mp_obj_t self_in) {
+static mp_obj_t curve_del(mp_obj_t self_in) {
     mp_obj_curve_t *self = MP_OBJ_TO_PTR(self_in);
 
     mbedtls_ecp_group_free(&self->grp);
 
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(curve_del_obj, curve_del);
+static MP_DEFINE_CONST_FUN_OBJ_1(curve_del_obj, curve_del);
 
 
 // Signing
-STATIC mp_obj_t curve_sign(mp_obj_t self_in, mp_obj_t privkey_in, mp_obj_t digest_in)
+static mp_obj_t curve_sign(mp_obj_t self_in, mp_obj_t privkey_in, mp_obj_t digest_in)
 {
     mp_obj_curve_t *self = MP_OBJ_TO_PTR(self_in);
 
@@ -80,27 +83,36 @@ STATIC mp_obj_t curve_sign(mp_obj_t self_in, mp_obj_t privkey_in, mp_obj_t diges
 
     CHECK_RESULT(mbedtls_mpi_read_binary(&privkey, pk_buf.buf, 32));
 
-    CHECK_RESULT(mbedtls_ecdsa_sign_det(&self->grp, &r, &s, &privkey, digest.buf, digest.len, MBEDTLS_MD_SHA256));
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    CHECK_RESULT(mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, NULL, 0));
 
+    CHECK_RESULT(mbedtls_ecdsa_sign_det_ext(&self->grp, &r, &s, &privkey,
+                                digest.buf, digest.len,
+                                MBEDTLS_MD_SHA256,
+                                mbedtls_ctr_drbg_random, &ctr_drbg));
+
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_entropy_free(&entropy);
     mbedtls_mpi_free(&privkey);
 
     // convert (R,S) output pair to 64 bytes
-    vstr_t vstr;
-    vstr_init_len(&vstr, 64);
+    uint8_t result[64];
 
-    uint8_t     *result = (uint8_t *)vstr.buf;
-    CHECK_RESULT(mbedtls_mpi_write_binary(&r, &result[0], 32));
-    CHECK_RESULT(mbedtls_mpi_write_binary(&s, &result[32], 32));
+    CHECK_RESULT(mbedtls_mpi_write_binary(&r, result, 32));
+    CHECK_RESULT(mbedtls_mpi_write_binary(&s, result + 32, 32));
 
     mbedtls_mpi_free(&r);
     mbedtls_mpi_free(&s);
 
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(result, 64);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(curve_sign_obj, curve_sign);
+static MP_DEFINE_CONST_FUN_OBJ_3(curve_sign_obj, curve_sign);
 
 // Verify
-STATIC mp_obj_t curve_verify(size_t n_args, const mp_obj_t *args)
+static mp_obj_t curve_verify(size_t n_args, const mp_obj_t *args)
 {
     mp_obj_curve_t *self = MP_OBJ_TO_PTR(args[0]);
     mp_obj_t pubkey_in = args[1];
@@ -155,24 +167,25 @@ STATIC mp_obj_t curve_verify(size_t n_args, const mp_obj_t *args)
 
     return rv;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR(curve_verify_obj, 4, curve_verify);
+static MP_DEFINE_CONST_FUN_OBJ_VAR(curve_verify_obj, 4, curve_verify);
 
 
-STATIC const mp_rom_map_elem_t curve_locals_dict_table[] = {
+static const mp_rom_map_elem_t curve_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&curve_del_obj) },
     { MP_ROM_QSTR(MP_QSTR_sign), MP_ROM_PTR(&curve_sign_obj) },
     { MP_ROM_QSTR(MP_QSTR_verify), MP_ROM_PTR(&curve_verify_obj) },
 };
-STATIC MP_DEFINE_CONST_DICT(curve_locals_dict, curve_locals_dict_table);
+static MP_DEFINE_CONST_DICT(curve_locals_dict, curve_locals_dict_table);
 
-STATIC const mp_obj_type_t modngu_ec_curve_type = {
-    { &mp_type_type },
-    .name = MP_QSTR_ec_curve,
-    .make_new = curve_make_new,
-    .locals_dict = (void *)&curve_locals_dict,
-};
+static MP_DEFINE_CONST_OBJ_TYPE(
+    modngu_ec_curve_type,
+    MP_QSTR_ec_curve,
+    MP_TYPE_FLAG_NONE,
+    make_new, curve_make_new,
+    locals_dict, &curve_locals_dict
+);
 
-STATIC const mp_rom_map_elem_t mp_module_ec_globals_table[] = {
+static const mp_rom_map_elem_t mp_module_ec_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_ec) },
 
     { MP_ROM_QSTR(MP_QSTR_curve), MP_ROM_PTR(&modngu_ec_curve_type) },
@@ -192,7 +205,7 @@ STATIC const mp_rom_map_elem_t mp_module_ec_globals_table[] = {
 
 };
 
-STATIC MP_DEFINE_CONST_DICT(mp_module_ec_globals, mp_module_ec_globals_table);
+static MP_DEFINE_CONST_DICT(mp_module_ec_globals, mp_module_ec_globals_table);
 
 const mp_obj_module_t mp_module_ec = {
     .base = { &mp_type_module },

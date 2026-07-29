@@ -454,4 +454,101 @@ for data in [
     except TypeError as e:
         assert str(e) == err, str(e)
 
+#
+# BIP-352 / BIP-374 point arithmetic
+#
+G = ngu.secp256k1.generator()
+n_bytes = ngu.secp256k1.curve_order()
+n_int = ngu.secp256k1.curve_order_int()
+
+def _mul_G(k):
+    # scalar * G, via the long-standing keypair path
+    return ngu.secp256k1.keypair((k % n_int).to_bytes(32, 'big')).pubkey().to_bytes()
+
+def _neg(p):
+    # negate a compressed point by flipping the y parity, as dleq.py does
+    q = bytearray(p)
+    q[0] = 0x03 if p[0] == 0x02 else 0x02
+    return bytes(q)
+
+# constants
+assert len(G) == 33 and G == _mul_G(1)
+assert len(n_bytes) == 32
+assert n_int == int.from_bytes(n_bytes, 'big')
+assert n_int == 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
+
+# scalar multiply agrees with the keypair path
+for k in (1, 2, 0x1234, n_int - 1):
+    assert ngu.secp256k1.ec_pubkey_tweak_mul(G, k.to_bytes(32, 'big')) == _mul_G(k)
+
+# accepts uncompressed input, always returns compressed
+two = (2).to_bytes(32, 'big')
+A = _mul_G(7)
+A_uncompressed = ngu.secp256k1.pubkey(A).to_bytes(True)
+assert len(A_uncompressed) == 65
+assert ngu.secp256k1.ec_pubkey_tweak_mul(A_uncompressed, two) == _mul_G(14)
+assert ngu.secp256k1.ec_pubkey_tweak_mul(A, two) == _mul_G(14)
+
+# point addition: (a*G) + (b*G) == (a+b mod n)*G
+a, b, c = 3, 5, n_int - 4
+assert ngu.secp256k1.ec_pubkey_combine([_mul_G(a), _mul_G(b)]) == _mul_G(8)
+assert ngu.secp256k1.ec_pubkey_combine([_mul_G(a), _mul_G(b), _mul_G(c)]) == _mul_G(4)
+
+# order independent, and a single element is a no-op
+assert ngu.secp256k1.ec_pubkey_combine([_mul_G(c), _mul_G(a), _mul_G(b)]) == _mul_G(4)
+assert ngu.secp256k1.ec_pubkey_combine([A]) == A
+
+# an intermediate point at infinity must not fail the total
+P, Q = _mul_G(11), _mul_G(13)
+assert ngu.secp256k1.ec_pubkey_combine([P, _neg(P), Q, Q, _neg(Q)]) == Q
+assert ngu.secp256k1.ec_pubkey_combine([P, Q, _neg(P)]) == Q
+
+# long list stays correct and must not exhaust stack or heap
+assert ngu.secp256k1.ec_pubkey_combine([_mul_G(i) for i in range(1, 51)]) == _mul_G(1275)
+
+try:
+    ngu.secp256k1.ec_pubkey_combine([])
+    assert False
+except ValueError as e:
+    assert "Empty pubkeys list" in str(e)
+
+try:
+    # total sum is the point at infinity
+    ngu.secp256k1.ec_pubkey_combine([P, _neg(P)])
+    assert False
+except ValueError as e:
+    assert "secp256k1_ec_pubkey_combine" in str(e)
+
+try:
+    ngu.secp256k1.ec_pubkey_combine([A, bytes(33)])
+    assert False
+except ValueError as e:
+    assert "secp256k1_ec_pubkey_parse" in str(e)
+
+try:
+    ngu.secp256k1.ec_pubkey_tweak_mul(bytes(33), two)
+    assert False
+except ValueError as e:
+    assert "secp256k1_ec_pubkey_parse" in str(e)
+
+try:
+    ngu.secp256k1.ec_pubkey_tweak_mul(G, bytes(31))
+    assert False
+except ValueError as e:
+    assert "scalar len != 32" in str(e)
+
+try:
+    # scalar is zero
+    ngu.secp256k1.ec_pubkey_tweak_mul(G, bytes(32))
+    assert False
+except ValueError as e:
+    assert "secp256k1_ec_pubkey_tweak_mul" in str(e)
+
+try:
+    # scalar is the curve order
+    ngu.secp256k1.ec_pubkey_tweak_mul(G, n_bytes)
+    assert False
+except ValueError as e:
+    assert "secp256k1_ec_pubkey_tweak_mul" in str(e)
+
 print("PASS - test_k1")

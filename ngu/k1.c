@@ -702,19 +702,37 @@ STATIC mp_obj_t s_ec_pubkey_combine(mp_obj_t pubkeys_in) {
         mp_raise_ValueError(MP_ERROR_TEXT("Empty pubkeys list"));
     }
 
-    secp256k1_pubkey *parsed = m_new(secp256k1_pubkey, n);
-    const secp256k1_pubkey **pubkeys = m_new(const secp256k1_pubkey *, n);
+    // fold pairwise to minimize memory use with large list
+    secp256k1_pubkey result;
+    bool result_inf = true;         // running sum starts at the point at infinity
     for (size_t i = 0; i < n; i++) {
         mp_buffer_info_t buf;
         mp_get_buffer_raise(items[i], &buf, MP_BUFFER_READ);
-        if (!secp256k1_ec_pubkey_parse(lib_ctx, &parsed[i], buf.buf, buf.len)) {
+
+        secp256k1_pubkey next;
+        if (!secp256k1_ec_pubkey_parse(lib_ctx, &next, buf.buf, buf.len)) {
             mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_parse"));
         }
-        pubkeys[i] = &parsed[i];
+
+        if (result_inf) {
+            result = next;          // infinity + next == next
+            result_inf = false;
+        } else {
+            // output must not alias an input: combine() zeroes it before reading
+            secp256k1_pubkey sum;
+            const secp256k1_pubkey *pair[2] = { &result, &next };
+
+            // a 2-way combine fails only when the sum is the point at infinity;
+            // track that so only an infinite *total* is an error
+            if (secp256k1_ec_pubkey_combine(lib_ctx, &sum, pair, 2)) {
+                result = sum;
+            } else {
+                result_inf = true;
+            }
+        }
     }
 
-    secp256k1_pubkey result;
-    if (!secp256k1_ec_pubkey_combine(lib_ctx, &result, pubkeys, n)) {
+    if (result_inf) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_combine"));
     }
 

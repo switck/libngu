@@ -1,88 +1,152 @@
-// 
-// random - RNG stuff
 //
-// - common interface to TRNG specific to your chip
-// - whitening
-// - pick new privkeys
+// random - cryptographic random number generation
+//
+// - all output comes from an HMAC_DRBG (SP 800-90A, SHA-256) which is seeded
+//   from the chip/OS entropy source on first use; see hmac_drbg.c
+// - reseed() mixes caller-provided entropy (secure elements, dice rolls...)
+//   into the DRBG state; it never replaces entropy already accumulated
+// - every output word is also XORed with a fresh word from the entropy
+//   source, so output stays unpredictable even if one side is weak
+// - an entropy source that gets stuck on one value (unclocked TRNG,
+//   persistent STM32 timeout-zero) or oscillates between two (dying ring
+//   oscillator) faults hard (OSError), even across calls
+// - calls must be serialized: by having no threads, or by the VM's GIL;
+//   direct C callers outside the VM own that serialization themselves
 //
 #include "py/runtime.h"
 #include "py/mperrno.h"
 #include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include "my_assert.h"
+#include "hmac_drbg.h"
+#include "entropy_health.h"
 
-// ESP32 code
-#ifdef ESP_PLATFORM
-# include "esp_system.h"
-# define CHIP_TRNG_SETUP()      
-# define CHIP_TRNG_32()         esp_random()
+#if MICROPY_PY_THREAD && !MICROPY_PY_THREAD_GIL
+# error "ngu.random keeps unsynchronized state; threads need the GIL enabled."
 #endif
 
-#ifdef MICROPY_PY_STM
-// ports/stm32/rng.c
-extern uint32_t rng_get(void);
-# define CHIP_TRNG_SETUP()      
-# define CHIP_TRNG_32()         rng_get()
-
-# ifndef MICROPY_HW_ENABLE_RNG
-# error "get a HW TRNG plz"
+//
+// Entropy source selection. Fail-closed: unknown targets do not build,
+// and there is no software fallback of any kind. See README for what an
+// integrator must guarantee about each source.
+//
+// Attestations are checked by value, not existence: an undefined macro
+// evaluates to 0 here, so absent, zero, and wrong values all fail alike.
+// Every backend has the same contract: chip_trng_read() fills one word or
+// says it could not.
+#if defined(ESP_PLATFORM)
+# if NGU_ESP32_RNG_IS_TRUE_RANDOM != 1
+#  error "Attest with NGU_ESP32_RNG_IS_TRUE_RANDOM=1 that esp_random() has a \
+true entropy source (RF or bootloader source enabled) before the first RNG \
+call on your chip and boot sequence; otherwise its output is pseudo-random."
 # endif
+# include "esp_system.h"
+static bool chip_trng_read(uint32_t *out)
+{
+    *out = esp_random();
+    return true;
+}
+
+#elif MICROPY_PY_STM
+# if NGU_STM32_RNG_GET_IS_HARDWARE != 1
+#  error "Attest with NGU_STM32_RNG_GET_IS_HARDWARE=1 that the rng_get() you \
+link reads the MCU's TRNG peripheral. Careful: when MICROPY_HW_ENABLE_RNG is \
+0, upstream MicroPython silently provides a PSEUDO-random rng_get()."
+# endif
+// ports/stm32/rng.c, or the board's replacement for it. Its API conflates
+// a peripheral timeout (returns 0) with a valid zero word, so treat every
+// zero as a failed read; a good TRNG loses one word in 2^32.
+extern uint32_t rng_get(void);
+static bool chip_trng_read(uint32_t *out)
+{
+    uint32_t w = rng_get();
+    if (w == 0) {
+        return false;
+    }
+    *out = w;
+    return true;
+}
+
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+# include <stdlib.h>
+static bool chip_trng_read(uint32_t *out)
+{
+    *out = arc4random();
+    return true;
+}
+
+#elif defined(__linux__)
+# include <unistd.h>
+static bool chip_trng_read(uint32_t *out)
+{
+    return getentropy(out, sizeof(uint32_t)) == 0;
+}
+
+#else
+# error "No entropy source known for this target. Add one here; hardware or OS entropy only."
 #endif
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
-# define CHIP_TRNG_SETUP()      
-# define CHIP_TRNG_32()         arc4random()
-#endif
+static hmac_drbg_t drbg;
+static bool drbg_seeded;
 
-#ifdef __linux__
-# define CHIP_TRNG_SETUP()
-# define CHIP_TRNG_32()         random()
-#endif
+// One usable word from the entropy source, or false: backend failure and
+// the health rule (stuck or oscillating source; see entropy_health.h) both
+// land here, so callers have a single wipe-then-raise error boundary.
+static bool trng_word_ok(uint32_t *out)
+{
+    static entropy_health_t health;
+    uint32_t rv;
 
-#ifndef CHIP_TRNG_SETUP
-# error "need chip TRNG function"
-# define CHIP_TRNG_SETUP()
-# define CHIP_TRNG_32()         0x5a5a5a5a
-#endif
+    if (!chip_trng_read(&rv) || !entropy_health_ok(&health, rv)) {
+        return false;
+    }
 
-// Yasmarang random number generator
-// by Ilya Levin
-// http://www.literatecode.com/yasmarang
-// Public Domain
+    *out = rv;
+    return true;
+}
 
-// TODO should be marked as confidential memory
-static uint32_t yasmarang_pad = 0x0a8ce26f, yasmarang_n = 69, yasmarang_d = 233;
-static uint8_t yasmarang_dat = 0;
+static uint32_t trng_word(void)
+{
+    uint32_t rv;
+    if (!trng_word_ok(&rv)) {
+        mp_raise_OSError(MP_EFAULT);
+    }
+    return rv;
+}
 
-STATIC uint32_t my_yasmarang(void) {
-    yasmarang_pad += yasmarang_dat + yasmarang_d * yasmarang_n;
-    yasmarang_pad = (yasmarang_pad << 3) + (yasmarang_pad >> 29);
-    yasmarang_n = yasmarang_pad | 2;
-    yasmarang_d ^= (yasmarang_pad << 31) + (yasmarang_pad >> 1);
-    yasmarang_dat ^= (char)yasmarang_pad ^ (yasmarang_d >> 8) ^ 1;
+// First use: seed the DRBG with 64 bytes of raw entropy. The SP 800-90A
+// minimum is 48 (256-bit strength + 128-bit nonce); the extra 16 bytes are
+// margin for a mildly biased source. No output can derive from constants.
+static void ensure_seeded(void)
+{
+    if (drbg_seeded) return;
 
-    return yasmarang_pad ^ (yasmarang_d << 5) ^ (yasmarang_pad >> 18) ^ (yasmarang_dat << 1);
-} 
+    uint32_t seed[16];
+    for (int i = 0; i < 16; i++) {
+        if (!trng_word_ok(&seed[i])) {
+            // wipe the words already collected, then fault
+            hmac_drbg_wipe(seed, sizeof(seed));
+            mp_raise_OSError(MP_EFAULT);
+        }
+    }
+    hmac_drbg_init(&drbg, (const uint8_t *)seed, sizeof(seed));
+    hmac_drbg_wipe(seed, sizeof(seed));
+
+    drbg_seeded = true;
+}
 
 void my_random_bytes(uint8_t *dest, uint32_t count)
 {
-    uint32_t last = 0;
+    ensure_seeded();
+    hmac_drbg_generate(&drbg, dest, count);
 
-    while(count) {
-        uint32_t chip = CHIP_TRNG_32();
-
-        if(chip == last) {
-            // maybe TRNG is not clocked? Fail hard
-            mp_raise_OSError(MP_EFAULT);
-        }
-        last = chip;
-
-        chip ^= my_yasmarang();
+    // XOR fresh entropy over the DRBG stream.
+    while (count) {
+        uint32_t chip = trng_word();
 
         int here = MIN(4, count);
-
-        memcpy(dest, &chip, here);
+        for (int i = 0; i < here; i++) {
+            dest[i] ^= (chip >> (i * 8)) & 0xff;
+        }
         dest += here;
         count -= here;
     }
@@ -90,11 +154,8 @@ void my_random_bytes(uint8_t *dest, uint32_t count)
 
 STATIC mp_obj_t random_uint32(void) {
     // full 32-bit values, not 30
-    CHIP_TRNG_SETUP();
-
-    uint32_t rv = my_yasmarang();
-
-    rv ^= CHIP_TRNG_32();
+    uint32_t rv;
+    my_random_bytes((uint8_t *)&rv, 4);
 
     return mp_obj_new_int_from_uint(rv);
 }
@@ -118,19 +179,16 @@ int _rand_below(int mx)
     int bl = _bit_length(mx);
     assert(bl && (bl < 31));
 
-    CHIP_TRNG_SETUP();
-
-    uint32_t mask = (2 << bl)-1;
-    uint32_t pt = my_yasmarang();
-    pt ^= CHIP_TRNG_32();
+    uint32_t mask = (1u << bl) - 1;
 
     while(1) {
+        uint32_t pt;
+        my_random_bytes((uint8_t *)&pt, 4);
+
         int rv = (int)(pt & mask);
         if(rv < mx) {
             return rv;
         }
-
-        pt ^= my_yasmarang();
     }
 }
 
@@ -145,8 +203,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_uniform_obj, random_uniform);
 STATIC mp_obj_t random_bytes(mp_obj_t count_in)
 {
     int count = mp_obj_get_int_truncated(count_in);
-    if(count > 4096) {
-        mp_raise_ValueError(MP_ERROR_TEXT("too many"));
+    if(count < 0 || count > 4096) {
+        mp_raise_ValueError(MP_ERROR_TEXT("out of range"));
     }
 
     vstr_t rv;
@@ -159,9 +217,26 @@ STATIC mp_obj_t random_bytes(mp_obj_t count_in)
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_bytes_obj, random_bytes);
 
 
+// Mix caller-provided entropy into the DRBG state. Takes any bytes-like
+// object; entropy from multiple sources composes. An int is accepted for
+// back-compat, but carries at most 32 bits -- pass bytes instead.
 STATIC mp_obj_t random_reseed(mp_obj_t arg)
 {
-    yasmarang_pad = mp_obj_get_int_truncated(arg);
+    mp_buffer_info_t inp;
+    uint8_t legacy[4];
+
+    if(!mp_get_buffer(arg, &inp, MP_BUFFER_READ)) {
+        uint32_t v = mp_obj_get_int_truncated(arg);
+        legacy[0] = v; legacy[1] = v >> 8; legacy[2] = v >> 16; legacy[3] = v >> 24;
+        inp.buf = legacy;
+        inp.len = sizeof(legacy);
+    }
+    if(inp.len == 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("empty"));
+    }
+
+    ensure_seeded();
+    hmac_drbg_reseed(&drbg, inp.buf, inp.len);
 
     return mp_const_none;
 }

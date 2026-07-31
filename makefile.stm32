@@ -6,8 +6,16 @@ BOARD = STM32L496GDISC
 
 
 
+# The hardware-TRNG attestation is earned per board: STM32L496GDISC sets
+# MICROPY_HW_ENABLE_RNG=1, so upstream's hardware rng.c is linked. Any
+# other BOARD (including command-line overrides) builds without it and
+# stops in ngu/random.c until its integrator attests for that board.
+ifeq ($(BOARD),STM32L496GDISC)
+RNG_ATTEST = -DNGU_STM32_RNG_GET_IS_HARDWARE=1
+endif
+
 MPY_MAKE_ARGS += PROJECT_TOP=$(CURDIR) BOARD=$(BOARD) -j 4 \
-				CFLAGS_EXTRA="-DMBEDTLS_ECP_C -DMBEDTLS_ECDSA_DETERMINISTIC -DMBEDTLS_HMAC_DRBG_C -DMBEDTLS_RIPEMD160_C -DMBEDTLS_ECDSA_C -DMBEDTLS_ASN1_WRITE_C" \
+				CFLAGS_EXTRA="-DMBEDTLS_ECP_C -DMBEDTLS_ECDSA_DETERMINISTIC -DMBEDTLS_HMAC_DRBG_C -DMBEDTLS_RIPEMD160_C -DMBEDTLS_ECDSA_C -DMBEDTLS_ASN1_WRITE_C $(RNG_ATTEST)" \
 				NGU_NEEDS_CIFRA=1 \
 				USER_C_MODULES=$(realpath .) NGU_TOP_DIR=$(realpath .)
 					

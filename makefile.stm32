@@ -29,3 +29,9 @@ include Makefile
 
 deploy:
 	cd $(MPY_PORT_DIR) && $(MAKE) $(MPY_MAKE_ARGS) deploy
+
+# for the ngu_tests "gates" target: show the attestation without building
+# (after the include, so it cannot become the default goal)
+.PHONY: show-rng-attest
+show-rng-attest:
+	@echo $(RNG_ATTEST)

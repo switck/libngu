@@ -4,3 +4,5 @@ __pycache__/
 .tags
 ENV
 .idea/
+ngu/ngu_tests/cavp-cifra
+ngu/ngu_tests/cavp-mbedtls

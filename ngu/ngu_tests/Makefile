@@ -2,7 +2,7 @@ MPY = ../../ngu-micropython
 PY = python3
 
 .PHONY: test tests
-test tests: cavp
+test tests: cavp health
 	test x$(VIRTUAL_ENV) != x		# need virtualenv
 	$(PY) test_aes.py
 	$(MPY) test_aes_gen.py
@@ -48,6 +48,14 @@ cavp-mbedtls: $(CAVP_DEPS) $(MBEDTLS)/library/sha256.c $(MBEDTLS)/library/platfo
 cavp: cavp-cifra cavp-mbedtls
 	./cavp-cifra
 	./cavp-mbedtls
+
+# deterministic tests of the entropy health rule (pure logic, host-compiled)
+entropy-health-test: entropy_health_test.c ../entropy_health.h
+	$(CC) -Wall -Werror -O1 -I.. -o $@ entropy_health_test.c
+
+.PHONY: health
+health: entropy-health-test
+	./entropy-health-test
 
 # runs the test compiled in, not here
 # or, on target

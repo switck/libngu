@@ -6,3 +6,4 @@ ENV
 .idea/
 ngu/ngu_tests/cavp-cifra
 ngu/ngu_tests/cavp-mbedtls
+ngu/ngu_tests/entropy-health-test

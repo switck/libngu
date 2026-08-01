@@ -161,7 +161,52 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_bytes_obj, random_bytes);
 
 STATIC mp_obj_t random_reseed(mp_obj_t arg)
 {
-    yasmarang_pad = mp_obj_get_int_truncated(arg);
+    // Absorb ALL of the supplied entropy into ALL generator state words.
+    //
+    // The previous implementation did `yasmarang_pad = int(arg)`, which
+    //   (a) kept only the low 32 bits of whatever was passed in, and
+    //   (b) never touched yasmarang_n / _d / _dat (left at fixed constants),
+    // so after reseeding the entire generator was a pure function of a single
+    // 32-bit word -> a 2**32 state space. When the on-chip TRNG is biased or
+    // backdoored this reseed is the only independent entropy, so its width is
+    // the wallet's real security margin. Feed the full digest, not 4 bytes.
+    //
+    // Accepts a bytes-like object (preferred) or, for backward compatibility
+    // with existing callers/tests, a plain integer.
+
+    uint8_t tmp[4];
+    const uint8_t *p;
+    size_t len;
+
+    mp_buffer_info_t buf;
+    if(mp_get_buffer(arg, &buf, MP_BUFFER_READ)) {
+        p = (const uint8_t *)buf.buf;
+        len = buf.len;
+    } else {
+        uint32_t v = mp_obj_get_int_truncated(arg);
+        tmp[0] = (uint8_t)(v);
+        tmp[1] = (uint8_t)(v >> 8);
+        tmp[2] = (uint8_t)(v >> 16);
+        tmp[3] = (uint8_t)(v >> 24);
+        p = tmp;
+        len = sizeof(tmp);
+    }
+
+    // Sponge-style absorb: fold each byte across the independent state words
+    // (yasmarang_n is re-derived from _pad on every step, so seeding _pad, _d
+    // and _dat covers the whole state), stepping the generator between bytes so
+    // that early input diffuses into every subsequent output.
+    for(size_t i = 0; i < len; i++) {
+        yasmarang_pad ^= (uint32_t)p[i] << ((i & 3) * 8);
+        yasmarang_d   += (uint32_t)p[i] * 0x01000193u;      // spread across 32 bits
+        yasmarang_dat ^= p[i];
+        (void)my_yasmarang();
+    }
+
+    // Final diffusion rounds so the first bytes fully affect the state.
+    for(int i = 0; i < 16; i++) {
+        (void)my_yasmarang();
+    }
 
     return mp_const_none;
 }

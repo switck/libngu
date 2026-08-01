@@ -30,9 +30,21 @@ for mx in range(10, 2000, 73):
     print(" => %.0f %%" % covered)
     assert covered >= 97        # maybe bad luck
 
-# api test only; can't verify results
-ngu.random.reseed(123)
+# api test only; can't verify results (public output is XOR-masked with the
+# chip TRNG, so the reseeded Yasmarang stream is not observable from here)
+ngu.random.reseed(123)                       # legacy int arg still accepted
 ngu.random.reseed(456)
 ngu.random.reseed(0xffff_ffff)
+
+# regression: reseed() must accept a full-width (digest) seed, not just 32 bits.
+# The historic bug fed only n[0:4] into reseed(); guard that the full digest is
+# a valid argument so a caller can hand over all of its entropy.
+ngu.random.reseed(bytes(range(32)))          # 32-byte digest (bytes)
+ngu.random.reseed(bytearray(b'\xa5' * 32))   # bytes-like (bytearray)
+ngu.random.reseed(b'\x01\x02\x03\x04\x05\x06\x07\x08')   # SE-sized minimum
+# generator keeps producing well-distributed output after a full-width reseed
+after = [ngu.random.uint32() for _ in range(1000)]
+assert len(after) == len(set(after)), 'bad luck, try again'
+assert max(after) > 0x80000000 and min(after) < 0x80000000
 
 print('PASS - test_random')

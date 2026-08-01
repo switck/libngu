@@ -51,6 +51,8 @@ static cf_hash_drbg_sha256 drbg;
 static bool drbg_ready;
 static uint32_t last_chip;
 
+#define DRBG_ENTROPY_WORDS 32
+
 STATIC uint32_t checked_chip_trng(void)
 {
     uint32_t chip = CHIP_TRNG_32();
@@ -64,25 +66,31 @@ STATIC uint32_t checked_chip_trng(void)
     return chip;
 }
 
-STATIC void drbg_setup(const void *seed, size_t seed_len)
+STATIC void drbg_seed_from_chip(void)
 {
-    if(drbg_ready) {
-        cf_hash_drbg_sha256_reseed(&drbg, seed, seed_len, NULL, 0);
-        return;
-    }
-
     CHIP_TRNG_SETUP();
 
-    uint32_t entropy[8];
-    for(int i = 0; i < 8; i++) {
+    uint32_t entropy[DRBG_ENTROPY_WORDS];
+    for(int i = 0; i < DRBG_ENTROPY_WORDS; i++) {
         entropy[i] = checked_chip_trng();
     }
 
-    static const char domain[] = "libngu.random";
-    cf_hash_drbg_sha256_init(&drbg, entropy, sizeof(entropy),
-                             NULL, 0, domain, sizeof(domain)-1);
+    if(drbg_ready) {
+        cf_hash_drbg_sha256_reseed(&drbg, entropy, sizeof(entropy), NULL, 0);
+    } else {
+        static const char domain[] = "libngu.random";
+        cf_hash_drbg_sha256_init(&drbg, entropy, sizeof(entropy),
+                                 NULL, 0, domain, sizeof(domain)-1);
+        drbg_ready = true;
+    }
     memset(entropy, 0, sizeof(entropy));
-    drbg_ready = true;
+}
+
+STATIC void drbg_setup(const void *seed, size_t seed_len)
+{
+    if(!drbg_ready) {
+        drbg_seed_from_chip();
+    }
 
     if(seed_len) {
         cf_hash_drbg_sha256_reseed(&drbg, seed, seed_len, NULL, 0);
@@ -97,12 +105,7 @@ void my_random_bytes(uint8_t *dest, uint32_t count)
         drbg_setup(NULL, 0);
     }
     if(cf_hash_drbg_sha256_needs_reseed(&drbg)) {
-        uint32_t entropy[8];
-        for(int i = 0; i < 8; i++) {
-            entropy[i] = checked_chip_trng();
-        }
-        cf_hash_drbg_sha256_reseed(&drbg, entropy, sizeof(entropy), NULL, 0);
-        memset(entropy, 0, sizeof(entropy));
+        drbg_seed_from_chip();
     }
     cf_hash_drbg_sha256_gen(&drbg, dest, count);
 

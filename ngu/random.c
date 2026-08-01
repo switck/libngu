@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "my_assert.h"
+#include "cifra/drbg.h"
 
 // ESP32 code
 #ifdef ESP_PLATFORM
@@ -46,27 +47,41 @@ extern uint32_t rng_get(void);
 # define CHIP_TRNG_32()         0x5a5a5a5a
 #endif
 
-// Yasmarang random number generator
-// by Ilya Levin
-// http://www.literatecode.com/yasmarang
-// Public Domain
+static cf_hash_drbg_sha256 drbg;
+static bool drbg_ready;
 
-// TODO should be marked as confidential memory
-static uint32_t yasmarang_pad = 0x0a8ce26f, yasmarang_n = 69, yasmarang_d = 233;
-static uint8_t yasmarang_dat = 0;
+STATIC void drbg_setup(const void *seed, size_t seed_len)
+{
+    if(drbg_ready) {
+        cf_hash_drbg_sha256_reseed(&drbg, seed, seed_len, NULL, 0);
+        return;
+    }
 
-STATIC uint32_t my_yasmarang(void) {
-    yasmarang_pad += yasmarang_dat + yasmarang_d * yasmarang_n;
-    yasmarang_pad = (yasmarang_pad << 3) + (yasmarang_pad >> 29);
-    yasmarang_n = yasmarang_pad | 2;
-    yasmarang_d ^= (yasmarang_pad << 31) + (yasmarang_pad >> 1);
-    yasmarang_dat ^= (char)yasmarang_pad ^ (yasmarang_d >> 8) ^ 1;
+    CHIP_TRNG_SETUP();
 
-    return yasmarang_pad ^ (yasmarang_d << 5) ^ (yasmarang_pad >> 18) ^ (yasmarang_dat << 1);
-} 
+    uint32_t entropy[8];
+    for(int i = 0; i < 8; i++) {
+        entropy[i] = CHIP_TRNG_32();
+    }
+
+    static const char domain[] = "libngu.random";
+    cf_hash_drbg_sha256_init(&drbg, entropy, sizeof(entropy),
+                             NULL, 0, domain, sizeof(domain)-1);
+    memset(entropy, 0, sizeof(entropy));
+    drbg_ready = true;
+
+    if(seed_len) {
+        cf_hash_drbg_sha256_reseed(&drbg, seed, seed_len, NULL, 0);
+    }
+}
 
 void my_random_bytes(uint8_t *dest, uint32_t count)
 {
+    if(!drbg_ready) {
+        drbg_setup(NULL, 0);
+    }
+    cf_hash_drbg_sha256_gen(&drbg, dest, count);
+
     uint32_t last = 0;
 
     while(count) {
@@ -78,11 +93,10 @@ void my_random_bytes(uint8_t *dest, uint32_t count)
         }
         last = chip;
 
-        chip ^= my_yasmarang();
-
         int here = MIN(4, count);
-
-        memcpy(dest, &chip, here);
+        for(int i = 0; i < here; i++) {
+            dest[i] ^= ((uint8_t *)&chip)[i];
+        }
         dest += here;
         count -= here;
     }
@@ -92,9 +106,8 @@ STATIC mp_obj_t random_uint32(void) {
     // full 32-bit values, not 30
     CHIP_TRNG_SETUP();
 
-    uint32_t rv = my_yasmarang();
-
-    rv ^= CHIP_TRNG_32();
+    uint32_t rv;
+    my_random_bytes((uint8_t *)&rv, sizeof(rv));
 
     return mp_obj_new_int_from_uint(rv);
 }
@@ -121,16 +134,14 @@ int _rand_below(int mx)
     CHIP_TRNG_SETUP();
 
     uint32_t mask = (2 << bl)-1;
-    uint32_t pt = my_yasmarang();
-    pt ^= CHIP_TRNG_32();
 
     while(1) {
+        uint32_t pt;
+        my_random_bytes((uint8_t *)&pt, sizeof(pt));
         int rv = (int)(pt & mask);
         if(rv < mx) {
             return rv;
         }
-
-        pt ^= my_yasmarang();
     }
 }
 
@@ -161,7 +172,13 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_bytes_obj, random_bytes);
 
 STATIC mp_obj_t random_reseed(mp_obj_t arg)
 {
-    yasmarang_pad = mp_obj_get_int_truncated(arg);
+    mp_buffer_info_t seed;
+    mp_get_buffer_raise(arg, &seed, MP_BUFFER_READ);
+    if(seed.len < 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("seed too short"));
+    }
+
+    drbg_setup(seed.buf, seed.len);
 
     return mp_const_none;
 }

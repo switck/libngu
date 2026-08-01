@@ -23,7 +23,7 @@ CFLAGS_USERMOD += -DNGU_INCL_AES=1
 CIFRA_SRC = $(NGU_TOP_DIR)/libs/cifra/src
 CIFRA_CFLAGS = $(CFLAGS) -DFULL_FAT_ASSERT -I$(NGU_TOP_DIR)/libs/cifra/src \
 					-I$(NGU_TOP_DIR)/libs/cifra/src/ext
-CIFRA_PARTS = hmac.o sha1.o sha3.o sha256.o sha512.o pbkdf2.o chash.o blockwise.o \
+CIFRA_PARTS = hmac.o sha1.o sha3.o sha256.o sha512.o pbkdf2.o chash.o blockwise.o drbg.o \
 				aes.o modes.o
 CIFRA_OBJS = $(addprefix $(CIFRA_SRC)/, $(CIFRA_PARTS))
 
@@ -43,4 +43,3 @@ PY_O += $(BUILD)/hack_lib_cifra.o
 endif
 
 SRC_USERMOD += $(addprefix $(USERMOD_DIR)/, $(MY_FILES))
-

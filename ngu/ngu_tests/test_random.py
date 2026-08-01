@@ -30,9 +30,24 @@ for mx in range(10, 2000, 73):
     print(" => %.0f %%" % covered)
     assert covered >= 97        # maybe bad luck
 
-# api test only; can't verify results
-ngu.random.reseed(123)
-ngu.random.reseed(456)
-ngu.random.reseed(0xffff_ffff)
+# reseed API boundaries
+for seed in (b'', bytes(31)):
+    try:
+        ngu.random.reseed(seed)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('short seed accepted')
+
+try:
+    ngu.random.reseed(123)
+except TypeError:
+    pass
+else:
+    raise AssertionError('integer seed accepted')
+
+ngu.random.reseed(bytes(32))
+ngu.random.reseed(bytes(64))
+ngu.random.reseed(bytearray(32))
 
 print('PASS - test_random')

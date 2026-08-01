@@ -42,6 +42,12 @@ ngu.random.reseed(0xffff_ffff)
 ngu.random.reseed(bytes(range(32)))          # 32-byte digest (bytes)
 ngu.random.reseed(bytearray(b'\xa5' * 32))   # bytes-like (bytearray)
 ngu.random.reseed(b'\x01\x02\x03\x04\x05\x06\x07\x08')   # SE-sized minimum
+# an empty seed must be rejected, not silently ignored (no-op reseed)
+try:
+    ngu.random.reseed(b'')
+    raise AssertionError('empty seed was accepted')
+except ValueError:
+    pass
 # generator keeps producing well-distributed output after a full-width reseed
 after = [ngu.random.uint32() for _ in range(1000)]
 assert len(after) == len(set(after)), 'bad luck, try again'

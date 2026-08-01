@@ -173,6 +173,12 @@ STATIC mp_obj_t random_reseed(mp_obj_t arg)
     //
     // Accepts a bytes-like object (preferred) or, for backward compatibility
     // with existing callers/tests, a plain integer.
+    //
+    // Ceiling: this generator's independent state is only pad(32) + d(32) +
+    // dat(8) = 72 bits (yasmarang_n is re-derived from pad every step), so it
+    // can retain at most ~72 bits of entropy no matter how many seed bytes are
+    // supplied. Callers needing a full 256-bit margin must not rely on this
+    // PRNG's state alone.
 
     uint8_t tmp[4];
     const uint8_t *p;
@@ -190,6 +196,11 @@ STATIC mp_obj_t random_reseed(mp_obj_t arg)
         tmp[3] = (uint8_t)(v >> 24);
         p = tmp;
         len = sizeof(tmp);
+    }
+
+    if(len == 0) {
+        // reject an empty seed rather than silently performing a no-op reseed
+        mp_raise_ValueError(MP_ERROR_TEXT("empty seed"));
     }
 
     // Sponge-style absorb: fold each byte across the independent state words

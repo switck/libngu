@@ -49,6 +49,20 @@ extern uint32_t rng_get(void);
 
 static cf_hash_drbg_sha256 drbg;
 static bool drbg_ready;
+static uint32_t last_chip;
+
+STATIC uint32_t checked_chip_trng(void)
+{
+    uint32_t chip = CHIP_TRNG_32();
+
+    if(!chip || chip == last_chip) {
+        // maybe TRNG is not clocked? Fail hard
+        mp_raise_OSError(MP_EFAULT);
+    }
+    last_chip = chip;
+
+    return chip;
+}
 
 STATIC void drbg_setup(const void *seed, size_t seed_len)
 {
@@ -61,7 +75,7 @@ STATIC void drbg_setup(const void *seed, size_t seed_len)
 
     uint32_t entropy[8];
     for(int i = 0; i < 8; i++) {
-        entropy[i] = CHIP_TRNG_32();
+        entropy[i] = checked_chip_trng();
     }
 
     static const char domain[] = "libngu.random";
@@ -77,21 +91,23 @@ STATIC void drbg_setup(const void *seed, size_t seed_len)
 
 void my_random_bytes(uint8_t *dest, uint32_t count)
 {
+    CHIP_TRNG_SETUP();
+
     if(!drbg_ready) {
         drbg_setup(NULL, 0);
     }
+    if(cf_hash_drbg_sha256_needs_reseed(&drbg)) {
+        uint32_t entropy[8];
+        for(int i = 0; i < 8; i++) {
+            entropy[i] = checked_chip_trng();
+        }
+        cf_hash_drbg_sha256_reseed(&drbg, entropy, sizeof(entropy), NULL, 0);
+        memset(entropy, 0, sizeof(entropy));
+    }
     cf_hash_drbg_sha256_gen(&drbg, dest, count);
 
-    uint32_t last = 0;
-
     while(count) {
-        uint32_t chip = CHIP_TRNG_32();
-
-        if(chip == last) {
-            // maybe TRNG is not clocked? Fail hard
-            mp_raise_OSError(MP_EFAULT);
-        }
-        last = chip;
+        uint32_t chip = checked_chip_trng();
 
         int here = MIN(4, count);
         for(int i = 0; i < here; i++) {

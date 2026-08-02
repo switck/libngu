@@ -13,6 +13,7 @@
 #include "my_assert.h"
 #include "hash.h"
 #include "rmd160.h"
+#include "cifra/ext/handy.h"
 
 #if 0
 // useful for testing Cifra on Unix port
@@ -274,12 +275,10 @@ STATIC mp_obj_t pbkdf2_sha512(mp_obj_t pass_in, mp_obj_t salt_in, mp_obj_t round
 		key += r;
 		key_len -= r;
 	};
-/*
-	explicit_bzero(asalt, sizeof(asalt));
-	explicit_bzero(d1, sizeof(d1));
-	explicit_bzero(d2, sizeof(d2));
-	explicit_bzero(obuf, sizeof(obuf));
-*/
+	mem_clean(asalt, sizeof(asalt));
+	mem_clean(d1, sizeof(d1));
+	mem_clean(d2, sizeof(d2));
+	mem_clean(obuf, sizeof(obuf));
 
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &key_out);
 }

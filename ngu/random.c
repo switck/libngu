@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include "my_assert.h"
 #include "cifra/drbg.h"
+#include "cifra/ext/handy.h"
 
 // ESP32 code
 #ifdef ESP_PLATFORM
@@ -83,7 +84,7 @@ static void drbg_seed_from_chip(void)
                                  NULL, 0, domain, sizeof(domain)-1);
         drbg_ready = true;
     }
-    memset(entropy, 0, sizeof(entropy));
+    mem_clean(entropy, sizeof entropy);
 }
 
 static void drbg_setup(const void *seed, size_t seed_len)

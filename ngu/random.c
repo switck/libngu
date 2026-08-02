@@ -53,7 +53,7 @@ static uint32_t last_chip;
 
 #define DRBG_ENTROPY_WORDS 32
 
-STATIC uint32_t checked_chip_trng(void)
+static uint32_t checked_chip_trng(void)
 {
     uint32_t chip = CHIP_TRNG_32();
 
@@ -66,7 +66,7 @@ STATIC uint32_t checked_chip_trng(void)
     return chip;
 }
 
-STATIC void drbg_seed_from_chip(void)
+static void drbg_seed_from_chip(void)
 {
     CHIP_TRNG_SETUP();
 
@@ -86,7 +86,7 @@ STATIC void drbg_seed_from_chip(void)
     memset(entropy, 0, sizeof(entropy));
 }
 
-STATIC void drbg_setup(const void *seed, size_t seed_len)
+static void drbg_setup(const void *seed, size_t seed_len)
 {
     if(!drbg_ready) {
         drbg_seed_from_chip();

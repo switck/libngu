@@ -651,7 +651,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_ecdh_multiply_obj, s_keypair_ecdh_mul
 
 // BIP-352 Silent Payments: Scalar multiplication
 // returns scalar * pubkey, as 33-byte compressed bytes
-STATIC mp_obj_t s_ec_pubkey_tweak_mul(mp_obj_t pubkey_in, mp_obj_t scalar_in) {
+static mp_obj_t s_ec_pubkey_tweak_mul(mp_obj_t pubkey_in, mp_obj_t scalar_in) {
     sec_setup_ctx();
 
     // Parse input pubkey
@@ -679,20 +679,18 @@ STATIC mp_obj_t s_ec_pubkey_tweak_mul(mp_obj_t pubkey_in, mp_obj_t scalar_in) {
     }
 
     // Serialize result as compressed pubkey (33 bytes)
-    vstr_t vstr;
-    vstr_init_len(&vstr, 33);
-    size_t outlen = 33;
-    secp256k1_ec_pubkey_serialize(lib_ctx, (uint8_t *)vstr.buf, &outlen, &pubkey,
+    uint8_t output[33];
+    size_t outlen = sizeof(output);
+    secp256k1_ec_pubkey_serialize(lib_ctx, output, &outlen, &pubkey,
                                   SECP256K1_EC_COMPRESSED);
 
-    vstr.len = outlen;
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(output, outlen);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_ec_pubkey_tweak_mul_obj, s_ec_pubkey_tweak_mul);
+static MP_DEFINE_CONST_FUN_OBJ_2(s_ec_pubkey_tweak_mul_obj, s_ec_pubkey_tweak_mul);
 
 // BIP-352 Silent Payments: N-ary point addition
 // returns the sum of a list of points, as 33-byte compressed bytes
-STATIC mp_obj_t s_ec_pubkey_combine(mp_obj_t pubkeys_in) {
+static mp_obj_t s_ec_pubkey_combine(mp_obj_t pubkeys_in) {
     sec_setup_ctx();
 
     size_t n;
@@ -736,16 +734,14 @@ STATIC mp_obj_t s_ec_pubkey_combine(mp_obj_t pubkeys_in) {
         mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_combine"));
     }
 
-    vstr_t vstr;
-    vstr_init_len(&vstr, 33);
-    size_t outlen = 33;
-    secp256k1_ec_pubkey_serialize(lib_ctx, (uint8_t *)vstr.buf, &outlen, &result,
+    uint8_t output[33];
+    size_t outlen = sizeof(output);
+    secp256k1_ec_pubkey_serialize(lib_ctx, output, &outlen, &result,
                                   SECP256K1_EC_COMPRESSED);
 
-    vstr.len = outlen;
-    return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
+    return mp_obj_new_bytes(output, outlen);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_ec_pubkey_combine_obj, s_ec_pubkey_combine);
+static MP_DEFINE_CONST_FUN_OBJ_1(s_ec_pubkey_combine_obj, s_ec_pubkey_combine);
 
 // MuSig2
 
@@ -1421,7 +1417,7 @@ STATIC const mp_obj_type_t s_keypair_type = {
 };
 
 // Generator point G (33-byte compressed)
-STATIC mp_obj_t s_generator(void) {
+static mp_obj_t s_generator(void) {
     // secp256k1 generator point G in compressed format
     // 0x0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
     static const uint8_t generator_bytes[33] = {
@@ -1433,7 +1429,7 @@ STATIC mp_obj_t s_generator(void) {
     };
     return mp_obj_new_bytes(generator_bytes, 33);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(s_generator_obj, s_generator);
+static MP_DEFINE_CONST_FUN_OBJ_0(s_generator_obj, s_generator);
 
 // Curve order n constant
 // 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
@@ -1445,16 +1441,16 @@ static const uint8_t secp256k1_order_bytes[32] = {
 };
 
 // Curve order n (32 bytes, big-endian)
-STATIC mp_obj_t s_curve_order(void) {
+static mp_obj_t s_curve_order(void) {
     return mp_obj_new_bytes(secp256k1_order_bytes, 32);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(s_curve_order_obj, s_curve_order);
+static MP_DEFINE_CONST_FUN_OBJ_0(s_curve_order_obj, s_curve_order);
 
 // Curve order n as integer (avoids int.from_bytes conversion in Python)
-STATIC mp_obj_t s_curve_order_int(void) {
+static mp_obj_t s_curve_order_int(void) {
     return mp_obj_int_from_bytes_impl(true, 32, secp256k1_order_bytes);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(s_curve_order_int_obj, s_curve_order_int);
+static MP_DEFINE_CONST_FUN_OBJ_0(s_curve_order_int_obj, s_curve_order_int);
 
 STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_secp256k1) },

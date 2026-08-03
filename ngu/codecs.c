@@ -188,7 +188,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_nip19_decode_obj, c_nip19_decode);
 
 
 // BIP-352 Silent Payment address encoding
-STATIC mp_obj_t c_bip352_encode(size_t n_args, const mp_obj_t *args)
+static mp_obj_t c_bip352_encode(size_t n_args, const mp_obj_t *args)
 {
     // Args: hrp, scan_key, spend_key, [version]
     // version is optional, defaults to 0
@@ -249,7 +249,7 @@ STATIC mp_obj_t c_bip352_encode(size_t n_args, const mp_obj_t *args)
 
     return mp_obj_new_str(tmp, strlen(tmp));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(c_bip352_encode_obj, 3, 4, c_bip352_encode);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(c_bip352_encode_obj, 3, 4, c_bip352_encode);
 
 
 STATIC const mp_rom_map_elem_t globals_table[] = {

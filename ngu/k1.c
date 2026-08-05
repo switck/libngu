@@ -7,6 +7,7 @@
 // - see test_k1.py
 //
 #include "py/runtime.h"
+#include "py/objint.h"
 #include "py/objlist.h" // For list-related functions
 #include "random.h"
 #include <string.h>
@@ -648,6 +649,99 @@ STATIC mp_obj_t s_keypair_ecdh_multiply(mp_obj_t self_in, mp_obj_t other_point_i
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(s_keypair_ecdh_multiply_obj, s_keypair_ecdh_multiply);
 
+// BIP-352 Silent Payments: Scalar multiplication
+// returns scalar * pubkey, as 33-byte compressed bytes
+static mp_obj_t s_ec_pubkey_tweak_mul(mp_obj_t pubkey_in, mp_obj_t scalar_in) {
+    sec_setup_ctx();
+
+    // Parse input pubkey
+    mp_buffer_info_t pubkey_buf;
+    mp_get_buffer_raise(pubkey_in, &pubkey_buf, MP_BUFFER_READ);
+
+    secp256k1_pubkey pubkey;
+    int ok = secp256k1_ec_pubkey_parse(lib_ctx, &pubkey, pubkey_buf.buf,
+                                       pubkey_buf.len);
+    if (!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_parse"));
+    }
+
+    // Get scalar (32 bytes)
+    mp_buffer_info_t scalar;
+    mp_get_buffer_raise(scalar_in, &scalar, MP_BUFFER_READ);
+    if (scalar.len != 32) {
+        mp_raise_ValueError(MP_ERROR_TEXT("scalar len != 32"));
+    }
+
+    // Multiply: result = scalar * pubkey
+    ok = secp256k1_ec_pubkey_tweak_mul(lib_ctx, &pubkey, scalar.buf);
+    if (!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_tweak_mul"));
+    }
+
+    // Serialize result as compressed pubkey (33 bytes)
+    uint8_t output[33];
+    size_t outlen = sizeof(output);
+    secp256k1_ec_pubkey_serialize(lib_ctx, output, &outlen, &pubkey,
+                                  SECP256K1_EC_COMPRESSED);
+
+    return mp_obj_new_bytes(output, outlen);
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(s_ec_pubkey_tweak_mul_obj, s_ec_pubkey_tweak_mul);
+
+// BIP-352 Silent Payments: N-ary point addition
+// returns the sum of a list of points, as 33-byte compressed bytes
+static mp_obj_t s_ec_pubkey_combine(mp_obj_t pubkeys_in) {
+    sec_setup_ctx();
+
+    size_t n;
+    mp_obj_t *items;
+    mp_obj_get_array(pubkeys_in, &n, &items);
+    if (n == 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("Empty pubkeys list"));
+    }
+
+    // fold pairwise to minimize memory use with large list
+    secp256k1_pubkey result;
+    bool result_inf = true;         // running sum starts at the point at infinity
+    for (size_t i = 0; i < n; i++) {
+        mp_buffer_info_t buf;
+        mp_get_buffer_raise(items[i], &buf, MP_BUFFER_READ);
+
+        secp256k1_pubkey next;
+        if (!secp256k1_ec_pubkey_parse(lib_ctx, &next, buf.buf, buf.len)) {
+            mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_parse"));
+        }
+
+        if (result_inf) {
+            result = next;          // infinity + next == next
+            result_inf = false;
+        } else {
+            // output must not alias an input: combine() zeroes it before reading
+            secp256k1_pubkey sum;
+            const secp256k1_pubkey *pair[2] = { &result, &next };
+
+            // a 2-way combine fails only when the sum is the point at infinity;
+            // track that so only an infinite *total* is an error
+            if (secp256k1_ec_pubkey_combine(lib_ctx, &sum, pair, 2)) {
+                result = sum;
+            } else {
+                result_inf = true;
+            }
+        }
+    }
+
+    if (result_inf) {
+        mp_raise_ValueError(MP_ERROR_TEXT("secp256k1_ec_pubkey_combine"));
+    }
+
+    uint8_t output[33];
+    size_t outlen = sizeof(output);
+    secp256k1_ec_pubkey_serialize(lib_ctx, output, &outlen, &result,
+                                  SECP256K1_EC_COMPRESSED);
+
+    return mp_obj_new_bytes(output, outlen);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(s_ec_pubkey_combine_obj, s_ec_pubkey_combine);
 
 // MuSig2
 
@@ -1322,6 +1416,41 @@ STATIC const mp_obj_type_t s_keypair_type = {
     .locals_dict = (void *)&s_keypair_locals_dict,
 };
 
+// Generator point G (33-byte compressed)
+static mp_obj_t s_generator(void) {
+    // secp256k1 generator point G in compressed format
+    // 0x0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
+    static const uint8_t generator_bytes[33] = {
+        0x02, 0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb,
+        0xac, 0x55, 0xa0, 0x62, 0x95, 0xce, 0x87, 0x0b,
+        0x07, 0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28,
+        0xd9, 0x59, 0xf2, 0x81, 0x5b, 0x16, 0xf8, 0x17,
+        0x98
+    };
+    return mp_obj_new_bytes(generator_bytes, 33);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(s_generator_obj, s_generator);
+
+// Curve order n constant
+// 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+static const uint8_t secp256k1_order_bytes[32] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+    0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b,
+    0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41
+};
+
+// Curve order n (32 bytes, big-endian)
+static mp_obj_t s_curve_order(void) {
+    return mp_obj_new_bytes(secp256k1_order_bytes, 32);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(s_curve_order_obj, s_curve_order);
+
+// Curve order n as integer (avoids int.from_bytes conversion in Python)
+static mp_obj_t s_curve_order_int(void) {
+    return mp_obj_int_from_bytes_impl(true, 32, secp256k1_order_bytes);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(s_curve_order_int_obj, s_curve_order_int);
 
 STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_secp256k1) },
@@ -1347,6 +1476,12 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_musig_nonce_process), MP_ROM_PTR(&s_musig_nonce_process_obj) },
     { MP_ROM_QSTR(MP_QSTR_musig_partial_sign), MP_ROM_PTR(&s_musig_partial_sign_obj) },
     { MP_ROM_QSTR(MP_QSTR_musig_partial_sig_agg), MP_ROM_PTR(&s_musig_partial_sig_agg_obj) },
+
+    { MP_ROM_QSTR(MP_QSTR_ec_pubkey_tweak_mul), MP_ROM_PTR(&s_ec_pubkey_tweak_mul_obj) },
+    { MP_ROM_QSTR(MP_QSTR_ec_pubkey_combine), MP_ROM_PTR(&s_ec_pubkey_combine_obj) },
+    { MP_ROM_QSTR(MP_QSTR_generator), MP_ROM_PTR(&s_generator_obj) },
+    { MP_ROM_QSTR(MP_QSTR_curve_order), MP_ROM_PTR(&s_curve_order_obj) },
+    { MP_ROM_QSTR(MP_QSTR_curve_order_int), MP_ROM_PTR(&s_curve_order_int_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

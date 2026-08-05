@@ -1,7 +1,16 @@
 diff --git a/ref/c/segwit_addr.c b/ref/c/segwit_addr.c
-index 390b3da..d6f100c 100644
+index 390b3da..bf199d5 100644
 --- a/ref/c/segwit_addr.c
 +++ b/ref/c/segwit_addr.c
+@@ -67,7 +67,7 @@ int bech32_encode(char *output, const char *hrp, const uint8_t *data, size_t dat
+         chk = bech32_polymod_step(chk) ^ (ch >> 5);
+         ++i;
+     }
+-    if (i + 7 + data_len > 90) return 0;
++    if (i + 7 + data_len > BECH32_MAX_LEN) return 0;
+     chk = bech32_polymod_step(chk);
+     while (*hrp != 0) {
+         chk = bech32_polymod_step(chk) ^ (*hrp & 0x1f);
 @@ -153,7 +153,7 @@ bech32_encoding bech32_decode(char* hrp, uint8_t *data, size_t *data_len, const
      }
  }
@@ -12,10 +21,28 @@ index 390b3da..d6f100c 100644
      int bits = 0;
      uint32_t maxv = (((uint32_t)1) << outbits) - 1;
 diff --git a/ref/c/segwit_addr.h b/ref/c/segwit_addr.h
-index 096870f..9a70e41 100644
+index 096870f..32c0e7b 100644
 --- a/ref/c/segwit_addr.h
 +++ b/ref/c/segwit_addr.h
-@@ -131,4 +131,14 @@ bech32_encoding bech32_decode(
+@@ -93,6 +93,17 @@ int segwit_addr_decode_detailed(
+     const char* addr
+ );
+ 
++/** Longest bech32/bech32m string this build will produce or accept from
++ *  bech32_encode(). BIP-173 caps segwit addresses at 90; BIP-352 silent
++ *  payment addresses are ~117.
++ */
++#define BECH32_MAX_LEN      128
++
++/** Output buffer size bech32_encode() requires: strlen(hrp) + data_len + 8.
++ *  Size every encode buffer with this so it tracks BECH32_MAX_LEN.
++ */
++#define BECH32_BUF_SIZE     (BECH32_MAX_LEN + 8)
++
+ /** Encode a Bech32 or Bech32m string
+  *
+  *  Out: output:  Pointer to a buffer of size strlen(hrp) + data_len + 8 that
+@@ -131,4 +142,14 @@ bech32_encoding bech32_decode(
      const char *input
  );
  

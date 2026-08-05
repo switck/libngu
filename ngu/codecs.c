@@ -100,7 +100,7 @@ STATIC mp_obj_t c_segwit_encode(mp_obj_t hrp_in, mp_obj_t witver_in, mp_obj_t pr
     mp_get_buffer_raise(prog_in, &prog, MP_BUFFER_READ);
 
 
-    char tmp[127];
+    char tmp[BECH32_BUF_SIZE];
 
     int ok = segwit_addr_encode(tmp, hrp, witver, prog.buf, prog.len);
     if(!ok) {
@@ -153,7 +153,7 @@ STATIC mp_obj_t c_nip19_encode(mp_obj_t hrp_in, mp_obj_t prog_in)
     size_t datalen = 0;
 	convert_bits(data, &datalen, 5, prog.buf, prog.len, 8, 1);
 
-	char tmp[127];
+	char tmp[BECH32_BUF_SIZE];
     int ok = bech32_encode(tmp, hrp, data, datalen, enc);
     if(!ok) {
         mp_raise_ValueError(MP_ERROR_TEXT("nip19_encode"));
@@ -187,6 +187,71 @@ STATIC mp_obj_t c_nip19_decode(mp_obj_t str_in)
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(c_nip19_decode_obj, c_nip19_decode);
 
 
+// BIP-352 Silent Payment address encoding
+static mp_obj_t c_bip352_encode(size_t n_args, const mp_obj_t *args)
+{
+    // Args: hrp, scan_key, spend_key, [version]
+    // version is optional, defaults to 0
+    const char *hrp = mp_obj_str_get_str(args[0]);
+
+    mp_buffer_info_t scan_key, spend_key;
+    mp_get_buffer_raise(args[1], &scan_key, MP_BUFFER_READ);
+    mp_get_buffer_raise(args[2], &spend_key, MP_BUFFER_READ);
+
+    // Get version (optional, defaults to 0)
+    int version = 0;
+    if (n_args >= 4) {
+        version = mp_obj_get_int_truncated(args[3]);
+    }
+
+    // Validate version per BIP-352
+    if (version < 0 || version > 31) {
+        mp_raise_ValueError(MP_ERROR_TEXT("version must be 0-31"));
+    }
+
+    // Validate input sizes
+    //  scan_key: 32 bytes (scan privkey) or 33 bytes (scan compressed pubkey)
+    //  spend_key: 33 bytes (compressed pubkey)
+    // The 32-byte form is not a BIP-352 address: it carries the scan privkey for
+    // the watch-only spscan/tspscan export, and is only meaningful under those HRPs.
+    if ((scan_key.len != 32 && scan_key.len != 33) || spend_key.len != 33) {
+        mp_raise_ValueError(MP_ERROR_TEXT("scan_key must be 32 or 33 bytes, spend_key 33"));
+    }
+
+    // Concatenate scan || spend (65 or 66 bytes)
+    size_t payload_len = scan_key.len + spend_key.len;
+    uint8_t payload[66];
+    memcpy(payload, scan_key.buf, scan_key.len);
+    memcpy(payload + scan_key.len, spend_key.buf, spend_key.len);
+
+    // Convert 8-bit to 5-bit encoding (max 106 symbols for 66 bytes)
+    uint8_t converted[106];
+    size_t converted_len = 0;
+    int conv_ok = convert_bits(converted, &converted_len, 5, payload, payload_len, 8, 1);
+    if (!conv_ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("convert_bits failed"));
+    }
+
+    // Build final data array with version prepended
+    // Total: 1 (version) + converted_len 5-bit values
+    uint8_t data[1 + sizeof(converted)];
+    data[0] = version;
+    memcpy(data + 1, converted, converted_len);
+    size_t datalen = 1 + converted_len;
+
+    bech32_encoding enc = BECH32_ENCODING_BECH32M;
+
+    char tmp[BECH32_BUF_SIZE];
+    int ok = bech32_encode(tmp, hrp, data, datalen, enc);
+    if(!ok) {
+        mp_raise_ValueError(MP_ERROR_TEXT("bip352_encode"));
+    }
+
+    return mp_obj_new_str(tmp, strlen(tmp));
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(c_bip352_encode_obj, 3, 4, c_bip352_encode);
+
+
 STATIC const mp_rom_map_elem_t globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_codecs) },
 
@@ -201,6 +266,8 @@ STATIC const mp_rom_map_elem_t globals_table[] = {
 
     { MP_ROM_QSTR(MP_QSTR_nip19_encode), MP_ROM_PTR(&c_nip19_encode_obj) },
     { MP_ROM_QSTR(MP_QSTR_nip19_decode), MP_ROM_PTR(&c_nip19_decode_obj) },
+
+    { MP_ROM_QSTR(MP_QSTR_bip352_encode), MP_ROM_PTR(&c_bip352_encode_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(globals_table_obj, globals_table);

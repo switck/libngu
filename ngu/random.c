@@ -38,8 +38,19 @@ extern uint32_t rng_get(void);
 #endif
 
 #ifdef __linux__
+# include <sys/random.h>
+// glibc random() is not a TRNG and is typically unseeded here — never use for keys.
+static uint32_t linux_trng_32(void)
+{
+    uint32_t v = 0;
+    ssize_t n = getrandom(&v, sizeof v, 0);
+    if(n != (ssize_t)sizeof v) {
+        mp_raise_OSError(MP_EFAULT);
+    }
+    return v;
+}
 # define CHIP_TRNG_SETUP()
-# define CHIP_TRNG_32()         random()
+# define CHIP_TRNG_32()         linux_trng_32()
 #endif
 
 #ifndef CHIP_TRNG_SETUP

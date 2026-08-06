@@ -1,6 +1,15 @@
 
 import ngu
 
+assert ngu.random.bytes(0) == b''
+for count in (-1, 4097):
+    try:
+        ngu.random.bytes(count)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('invalid byte count accepted')
+
 for trial in range(100):
     v = [ngu.random.uint32() for i in range(100)]
     assert len(v) == len(set(v)), 'bad luck, try again'

@@ -176,8 +176,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(random_uniform_obj, random_uniform);
 STATIC mp_obj_t random_bytes(mp_obj_t count_in)
 {
     int count = mp_obj_get_int_truncated(count_in);
-    if(count > 4096) {
-        mp_raise_ValueError(MP_ERROR_TEXT("too many"));
+    if(count < 0 || count > 4096) {
+        mp_raise_ValueError(MP_ERROR_TEXT("out of range"));
     }
 
     vstr_t rv;

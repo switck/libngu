@@ -1,8 +1,8 @@
 MPY = ../../ngu-micropython
 PY = python3
 
-.PHONY: test tests hash-drbg-cavp
-test tests: hash-drbg-cavp
+.PHONY: test tests hash-drbg-cavp entropy-health
+test tests: hash-drbg-cavp entropy-health
 	test x$(VIRTUAL_ENV) != x		# need virtualenv
 	$(PY) test_aes.py
 	$(MPY) test_aes_gen.py
@@ -42,6 +42,12 @@ hash-drbg-cavp: $(CIFRA_DRBG_SRCS)
 		trap 'rm -f "$$bin"' 0; \
 		$(CIFRA_DRBG_CC) -o "$$bin" $(CIFRA_DRBG_SRCS); \
 		"$$bin" hashdrbg-sha256 hashdrbg-sha256-addnl
+
+entropy-health: entropy_health_test.c ../entropy_health.h
+	@set -e; bin=$$(mktemp /tmp/libngu-entropy-health.XXXXXX); \
+		trap 'rm -f "$$bin"' 0; \
+		$(CC) -std=c99 -Wall -Wextra -Werror -I.. -o "$$bin" entropy_health_test.c; \
+		"$$bin"
 
 # runs the test compiled in, not here
 # or, on target

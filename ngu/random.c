@@ -13,6 +13,7 @@
 #include "my_assert.h"
 #include "cifra/drbg.h"
 #include "cifra/ext/handy.h"
+#include "entropy_health.h"
 
 // ESP32 code
 #ifdef ESP_PLATFORM
@@ -61,7 +62,7 @@ static uint32_t linux_trng_32(void)
 
 static cf_hash_drbg_sha256 drbg;
 static bool drbg_ready;
-static uint32_t last_chip;
+static entropy_health_t chip_health;
 
 #define DRBG_ENTROPY_WORDS 32
 
@@ -69,11 +70,10 @@ static uint32_t checked_chip_trng(void)
 {
     uint32_t chip = CHIP_TRNG_32();
 
-    if(!chip || chip == last_chip) {
-        // maybe TRNG is not clocked? Fail hard
+    if(!chip || !entropy_health_accept(&chip_health, chip)) {
+        // The source may be unclocked, stuck, or alternating between two words.
         mp_raise_OSError(MP_EFAULT);
     }
-    last_chip = chip;
 
     return chip;
 }

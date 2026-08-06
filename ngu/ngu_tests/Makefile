@@ -1,7 +1,8 @@
 MPY = ../../ngu-micropython
 PY = python3
 
-test tests:
+.PHONY: test tests hash-drbg-cavp
+test tests: hash-drbg-cavp
 	test x$(VIRTUAL_ENV) != x		# need virtualenv
 	$(PY) test_aes.py
 	$(MPY) test_aes_gen.py
@@ -26,6 +27,19 @@ test tests:
 	$(PY) test_bip39.py
 	$(MPY) test_bip39.py
 	$(MPY) test_bip32.py
+
+CIFRA_SRC = ../../libs/cifra/src
+CIFRA_DRBG_SRCS = $(CIFRA_SRC)/testdrbg.c $(CIFRA_SRC)/drbg.c \
+	$(CIFRA_SRC)/sha1.c $(CIFRA_SRC)/sha256.c $(CIFRA_SRC)/sha512.c \
+	$(CIFRA_SRC)/blockwise.c $(CIFRA_SRC)/hmac.c $(CIFRA_SRC)/chash.c
+CIFRA_DRBG_CC = $(CC) -std=gnu99 -Wall -Wextra -Werror -DFULL_FAT_ASSERT \
+	-I$(CIFRA_SRC) -I$(CIFRA_SRC)/ext
+
+hash-drbg-cavp: $(CIFRA_DRBG_SRCS)
+	@set -e; bin=$$(mktemp /tmp/libngu-cifra-drbg.XXXXXX); \
+		trap 'rm -f "$$bin"' 0; \
+		$(CIFRA_DRBG_CC) -o "$$bin" $(CIFRA_DRBG_SRCS); \
+		"$$bin" hashdrbg-sha256 hashdrbg-sha256-addnl
 
 # runs the test compiled in, not here
 # or, on target

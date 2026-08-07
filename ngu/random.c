@@ -27,7 +27,7 @@ extern uint32_t rng_get(void);
 # define CHIP_TRNG_SETUP()      
 # define CHIP_TRNG_32()         rng_get()
 
-# ifndef MICROPY_HW_ENABLE_RNG
+# if MICROPY_HW_ENABLE_RNG == 0 && NGU_STM32_EXTERNAL_RNG_GET != 1
 # error "get a HW TRNG plz"
 # endif
 #endif

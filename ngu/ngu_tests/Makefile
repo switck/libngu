@@ -54,12 +54,17 @@ gates:
 	@set -e; log=$$(mktemp /tmp/libngu-rng-gates.XXXXXX); \
 		trap 'rm -f "$$log"' 0; \
 		! $(GATE_STM_BASE) 2>"$$log"; \
-		grep -q 'MICROPY_HW_ENABLE_RNG=1 required' "$$log"; \
+		grep -q 'MICROPY_HW_ENABLE_RNG=1 or NGU_STM32_EXTERNAL_RNG_GET=1 required' "$$log"; \
 		! $(GATE_STM_BASE) -DMICROPY_HW_ENABLE_RNG=0 2>"$$log"; \
-		grep -q 'MICROPY_HW_ENABLE_RNG=1 required' "$$log"; \
+		grep -q 'MICROPY_HW_ENABLE_RNG=1 or NGU_STM32_EXTERNAL_RNG_GET=1 required' "$$log"; \
 		! $(GATE_STM_BASE) -DMICROPY_HW_ENABLE_RNG=2 2>"$$log"; \
-		grep -q 'MICROPY_HW_ENABLE_RNG=1 required' "$$log"; \
+		grep -q 'MICROPY_HW_ENABLE_RNG=1 or NGU_STM32_EXTERNAL_RNG_GET=1 required' "$$log"; \
+		! $(GATE_STM_BASE) -DMICROPY_HW_ENABLE_RNG=0 -DNGU_STM32_EXTERNAL_RNG_GET=0 2>"$$log"; \
+		grep -q 'MICROPY_HW_ENABLE_RNG=1 or NGU_STM32_EXTERNAL_RNG_GET=1 required' "$$log"; \
+		! $(GATE_STM_BASE) -DMICROPY_HW_ENABLE_RNG=0 -DNGU_STM32_EXTERNAL_RNG_GET=2 2>"$$log"; \
+		grep -q 'MICROPY_HW_ENABLE_RNG=1 or NGU_STM32_EXTERNAL_RNG_GET=1 required' "$$log"; \
 		$(GATE_STM); \
+		$(GATE_STM_BASE) -DMICROPY_HW_ENABLE_RNG=0 -DNGU_STM32_EXTERNAL_RNG_GET=1; \
 		! $(GATE_ESP) 2>"$$log"; \
 		grep -q 'NGU_ESP32_RNG_IS_TRUE_RANDOM=1 required' "$$log"; \
 		! $(GATE_ESP) -DNGU_ESP32_RNG_IS_TRUE_RANDOM=0 2>"$$log"; \

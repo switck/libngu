@@ -23,7 +23,7 @@ static bool chip_trng_read(uint32_t *out)
     return true;
 }
 
-#elif MICROPY_PY_STM
+#elif defined(MICROPY_PY_STM)
 # if MICROPY_HW_ENABLE_RNG != 1 && NGU_STM32_EXTERNAL_RNG_GET != 1
 #  error "MICROPY_HW_ENABLE_RNG=1 or NGU_STM32_EXTERNAL_RNG_GET=1 required"
 # endif

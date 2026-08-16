@@ -38,6 +38,22 @@ except ImportError:
             print(f'assert {vector!r} == {code}decode({code}encode({vector!r})), "fail @ {ln}"', file=fd)
 
 
+    max_b58_payload = b'\x01' + (b'A' * 127)
+    max_b58_encoded = b58encode(max_b58_payload)
+    overlong_b58_encoded = b58encode(b'\x00' + (b'A' * 128))
+    print(f'''# Maximum payload accepted by ngu.codecs.b58_decode.
+max_b58_payload = b'\\x01' + (b'A' * 127)
+assert max_b58_payload == b58decode({max_b58_encoded!r}), "fail @ max b58 payload"
+
+if ngu:
+ try:
+  b58decode({overlong_b58_encoded!r})
+ except ValueError:
+  pass
+ else:
+  raise AssertionError("accepted overlong b58 payload")
+''', file=fd)
+
     print(f'\nif ngu:\n msg = {pat!r}', file=fd)
     for hrp in ['bc', 'tb']:
         for ver in [0, 1, 15]:

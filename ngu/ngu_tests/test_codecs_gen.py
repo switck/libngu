@@ -93,6 +93,18 @@ assert b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xd
 # len=85
 assert b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12' == b58decode('4sS4hhDhzBTrQGDDZy6JhPuozauitcS761BvMnmmFt6GagpHmzGUsY5FqxfcoLYsN3GsX2eNG4NhwDoNEojavU4GBHdvrBqoNoHr9uwD17ebL4EJ9KqeY8spWW'), "fail @ 85"
 assert b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12' == b58decode(b58encode(b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xddl\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12')), "fail @ 85"
+# Maximum payload accepted by ngu.codecs.b58_decode.
+max_b58_payload = b'\x01' + (b'A' * 127)
+assert max_b58_payload == b58decode('qjmdX2xpuEaRph9ujegJVGSUp3QDqB3nZK3DjeQ7q16nE7xurz7gctQzwX2JwbCUsFt8TDAcePsDqUKfWTQzrSsMkEvBVogcNrx7nqXp2pjY2B5aeLW1MenfDyQdUGidomV1gL4pb9ixNwf2gJnh73x6NSshbakZbtCnPjhx9wDF2rnaKbs'), "fail @ max b58 payload"
+
+if ngu:
+ try:
+  b58decode('1khM1jvm3wqAyFkzzHEnEgLqqwB9pWC1VqyAzREXj836BYmF8PpCzXB6WwsvB5wfHz4LqgVucxXW2WTVjXQgWsLC9bmUgQprWibnR66WdAdo8p437AUV1KWswGdaBhT6Kzvt7cG6Rfcpceg16WEwxxRePpECTQ1G4EGuZhPHiT1byafYxTb7X')
+ except ValueError:
+  pass
+ else:
+  raise AssertionError("accepted overlong b58 payload")
+
 
 if ngu:
  msg = b'l\xf9\xa0\xe2\x89"H-C6Q\x04pHa\xc2\x18)0A\x12u~\tH`\xd4\x18\xc9x\x0e\xdd'

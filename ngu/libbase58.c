@@ -232,6 +232,10 @@ int base58_decode_check(const char *str, uint8_t *data, int datalen)
 	if (b58tobin(d, &res, str) != true) {
 		return 0;
 	}
+	if (res < 4 || res > datalen + 4) {
+		// decoded size impossible for this buffer; reject before nd underflows
+		return 0;
+	}
 	uint8_t *nd = d + datalen + 4 - res;
 	if (b58check(nd, res, str) < 0) {
 		return 0;

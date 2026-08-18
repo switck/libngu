@@ -63,6 +63,16 @@ if ngu:
                 print(f' assert ngu.codecs.segwit_decode({exp!r}) == ({hrp!r}, {ver}, msg[0:{alen}])', file=fd)
                 print(f' assert ngu.codecs.segwit_encode({hrp!r}, {ver}, msg[0:{alen}]) == {exp!r}', file=fd)
 
+    overlong_hrp = 'abcdefghijklmnopqrst'
+    overlong_addr = segwit_addr.encode(overlong_hrp, 0, pat[:20])
+    print(f''' try:
+  ngu.codecs.segwit_decode({overlong_addr!r})
+ except ValueError:
+  pass
+ else:
+  raise AssertionError("accepted 20-character HRP")
+''', file=fd)
+
     nip19_test_vectors = [
         ('3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d',
          'nsec180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsgyumg0',

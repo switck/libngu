@@ -132,6 +132,13 @@ if ngu:
  assert ngu.codecs.segwit_encode('tb', 15, msg[0:20]) == 'tb10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpwv60w5'
  assert ngu.codecs.segwit_decode('tb10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsvzkkmw') == ('tb', 15, msg[0:32])
  assert ngu.codecs.segwit_encode('tb', 15, msg[0:32]) == 'tb10dnu6pc5fyfyz6sek2yz8qjrpcgvzjvzpzf6huz2gvr2p3jtcpmwsvzkkmw'
+ try:
+  ngu.codecs.segwit_decode('abcdefghijklmnopqrst1qdnu6pc5fyfyz6sek2yz8qjrpcgvzjvzp6sj54m')
+ except ValueError:
+  pass
+ else:
+  raise AssertionError("accepted 20-character HRP")
+
 
 
  key_bytes = a2b_hex("3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")

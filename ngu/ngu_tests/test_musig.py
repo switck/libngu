@@ -101,6 +101,15 @@ else:
 
         session = ngu.secp256k1.musig_nonce_process(aggnonce, msg, kac)
         sessions.append(session)
+
+        cleared_sn, _ = ngu.secp256k1.musig_nonce_gen(kp.pubkey())
+        cleared_sn.clear()
+        try:
+            ngu.secp256k1.musig_partial_sign(cleared_sn, kp, kac, session)
+            raise RuntimeError
+        except ValueError:
+            pass
+
         partial_signature = ngu.secp256k1.musig_partial_sign(sn, kp, kac, session)
 
         # re-sign with the same secnonce causes error

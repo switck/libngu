@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "my_assert.h"
+#include "cifra/ext/handy.h"
 
 #include "sec_shared.h"
 
@@ -918,6 +919,14 @@ STATIC mp_obj_t s_musig_nonce_gen(size_t n_args, const mp_obj_t *pos_args, mp_ma
 MP_DEFINE_CONST_FUN_OBJ_KW(s_musig_nonce_gen_obj, 1, s_musig_nonce_gen);
 
 
+STATIC mp_obj_t s_secnonce_clear(mp_obj_t secnonce_in) {
+    mp_obj_musig_secnonce_t *self = MP_OBJ_TO_PTR(secnonce_in);
+    mem_clean(&self->secnonce, sizeof(self->secnonce));
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(s_secnonce_clear_obj, s_secnonce_clear);
+
+
 STATIC mp_obj_t s_pubnonce_to_bytes(mp_obj_t pubnonce_in) {
     mp_obj_musig_pubnonce_t *self = MP_OBJ_TO_PTR(pubnonce_in);
 
@@ -1312,9 +1321,15 @@ STATIC const mp_obj_type_t s_musig_aggnonce_type = {
     .locals_dict = (void *)&s_musig_aggnonce_locals_dict,
 };
 
+STATIC const mp_rom_map_elem_t s_musig_secnonce_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_clear), MP_ROM_PTR(&s_secnonce_clear_obj) },
+};
+STATIC MP_DEFINE_CONST_DICT(s_musig_secnonce_locals_dict, s_musig_secnonce_locals_dict_table);
+
 STATIC const mp_obj_type_t s_musig_secnonce_type = {
     { &mp_type_type },
     .name = MP_QSTR_secp256k1_musig_secnonce,
+    .locals_dict = (void *)&s_musig_secnonce_locals_dict,
 };
 #endif // NGU_INCL_MUSIG
 
